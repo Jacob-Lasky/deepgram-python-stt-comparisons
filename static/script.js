@@ -1,12 +1,40 @@
-let isRecording = false;
+let providers = [];
 let socket;
-let microphone;
-let audioContext;
-let processor;
-// Track which parameters have been changed during this session
-let changedParams = new Set();
-// Track if we're in a post-import state
-let isImported = false;
+
+class Provider {
+  constructor(id) {
+    this.id = id;
+    this.isRecording = false;
+    this.microphone = null;
+    this.changedParams = new Set();
+    this.isImported = false;
+    this.column = null;
+  }
+
+  getElement(selector) {
+    if (!this.column) {
+      this.column = document.getElementById(`provider-${this.id}`);
+    }
+    return this.column?.querySelector(selector);
+  }
+
+  getAllElements(selector) {
+    if (!this.column) {
+      this.column = document.getElementById(`provider-${this.id}`);
+    }
+    return this.column?.querySelectorAll(selector) || [];
+  }
+
+  remove() {
+    if (this.column) {
+      this.column.remove();
+      const index = providers.indexOf(this);
+      if (index > -1) {
+        providers.splice(index, 1);
+      }
+    }
+  }
+}
 
 let DEFAULT_CONFIG = {
     "base_url": "api.deepgram.com",
@@ -43,44 +71,47 @@ fetch('../config/defaults.json')
     updateRequestUrl(getConfig());
   });
 
-function setDefaultValues() {
+function setDefaultValues(provider) {
     if (!DEFAULT_CONFIG) return;
     
     // Set text input defaults
-    ['baseUrl', 'model', 'language', 'utterance_end_ms', 'endpointing'].forEach(id => {
-        const element = document.getElementById(id);
-        if (element && DEFAULT_CONFIG[id]) {
-            element.value = DEFAULT_CONFIG[id];
+    ['baseUrl', 'model', 'language', 'utterance_end_ms', 'endpointing'].forEach(className => {
+        const element = provider.getElement(`.${className}`);
+        if (element && DEFAULT_CONFIG[className]) {
+            element.value = DEFAULT_CONFIG[className];
         }
     });
 
     // Set checkbox defaults
     ['smart_format', 'interim_results', 'no_delay', 'dictation', 
-     'numerals', 'profanity_filter', 'redact'].forEach(id => {
-        const element = document.getElementById(id);
-        if (element && DEFAULT_CONFIG[id] !== undefined) {
-            element.checked = DEFAULT_CONFIG[id];
+     'numerals', 'profanity_filter', 'redact'].forEach(className => {
+        const element = provider.getElement(`.${className}`);
+        if (element && DEFAULT_CONFIG[className] !== undefined) {
+            element.checked = DEFAULT_CONFIG[className];
         }
     });
 
     // Set extra params default
-    document.getElementById('extraParams').value = JSON.stringify(DEFAULT_CONFIG.extra || {}, null, 2);
+    const extraParams = provider.getElement('.extraParams');
+    if (extraParams) {
+        extraParams.value = JSON.stringify(DEFAULT_CONFIG.extra || {}, null, 2);
+    }
 }
 
-function resetConfig() {
+function resetConfig(provider) {
     if (!DEFAULT_CONFIG) return;
     // Clear changed parameters tracking and import state
-    changedParams.clear();
-    isImported = false;
-    setDefaultValues();
-    updateRequestUrl(getConfig());
+    provider.changedParams.clear();
+    provider.isImported = false;
+    setDefaultValues(provider);
+    updateRequestUrl(getConfig(provider), provider);
 }
 
-function importConfig(input) {
+function importConfig(input, provider) {
     if (!DEFAULT_CONFIG) return;
     
     // Reset all options to defaults first
-    setDefaultValues();
+    setDefaultValues(provider);
     
     let config;
     
@@ -95,19 +126,19 @@ function importConfig(input) {
     }
 
     // Set import state
-    isImported = true;
+    provider.isImported = true;
 
     // Clear all form fields first
-    ['baseUrl', 'model', 'language', 'utterance_end_ms', 'endpointing'].forEach(id => {
-        const element = document.getElementById(id);
+    ['baseUrl', 'model', 'language', 'utterance_end_ms', 'endpointing'].forEach(className => {
+        const element = provider.getElement(`.${className}`);
         if (element) {
             element.value = '';
         }
     });
 
     ['smart_format', 'interim_results', 'no_delay', 'dictation', 
-     'numerals', 'profanity_filter', 'redact'].forEach(id => {
-        const element = document.getElementById(id);
+     'numerals', 'profanity_filter', 'redact'].forEach(className => {
+        const element = provider.getElement(`.${className}`);
         if (element) {
             element.checked = false;
         }
@@ -115,35 +146,44 @@ function importConfig(input) {
 
     // Only set values that are explicitly in the config
     Object.entries(config).forEach(([key, value]) => {
-        const element = document.getElementById(key);
+        const element = provider.getElement(`.${key}`);
         if (element) {
             if (element.type === 'checkbox') {
                 element.checked = value === 'true' || value === true;
             } else {
                 element.value = value;
             }
-            changedParams.add(key);
+            provider.changedParams.add(key);
         } else {
             // If the key doesn't correspond to a form element, it's an extra param
-            const extraParams = document.getElementById('extraParams');
-            const currentExtra = JSON.parse(extraParams.value || '{}');
-            currentExtra[key] = value;
-            extraParams.value = JSON.stringify(currentExtra, null, 2);
-            changedParams.add('extraParams');
+            const extraParams = provider.getElement('.extraParams');
+            if (extraParams) {
+                const currentExtra = JSON.parse(extraParams.value || '{}');
+                currentExtra[key] = value;
+                extraParams.value = JSON.stringify(currentExtra, null, 2);
+                provider.changedParams.add('extraParams');
+            }
         }
     });
 
     // Set baseUrl if not in config
     if (!config.baseUrl) {
-        document.getElementById('baseUrl').value = 'api.deepgram.com';
+        const baseUrlElement = provider.getElement('.baseUrl');
+        if (baseUrlElement) {
+            baseUrlElement.value = 'api.deepgram.com';
+        }
     }
 
     // Update the URL display
-    updateRequestUrl();
+    updateRequestUrl(getConfig(provider), provider);
 }
 
 socket.on("transcription_update", (data) => {
-  const finalCaptions = document.getElementById("finalCaptions");
+  const provider = providers.find(p => p.id === data.providerId);
+  if (!provider) return;
+  
+  const finalCaptions = provider.getElement(".finalCaptions");
+  if (!finalCaptions) return;
   
   // Update final container
   if (data.is_final) {
@@ -181,74 +221,75 @@ async function getMicrophone() {
   }
 }
 
-async function openMicrophone(microphone, socket) {
+async function openMicrophone(microphone, socket, provider) {
   return new Promise((resolve) => {
     microphone.onstart = () => {
-      console.log("Client: Microphone opened");
-      document.body.classList.add("recording");
+      console.log(`Client: Microphone opened for provider ${provider.id}`);
+      document.body.classList.add(`recording-${provider.id}`);
       resolve();
     };
     microphone.ondataavailable = async (event) => {
-      console.log("client: microphone data received");
+      console.log(`Client: Microphone data received for provider ${provider.id}`);
       if (event.data.size > 0) {
-        socket.emit("audio_stream", event.data);
+        socket.emit("audio_stream", { data: event.data, providerId: provider.id });
       }
     };
     microphone.start(1000);
   });
 }
 
-async function startRecording() {
-  isRecording = true;
-  microphone = await getMicrophone();
-  console.log("Client: Waiting to open microphone");
+async function startRecording(provider) {
+  provider.isRecording = true;
+  provider.microphone = await getMicrophone();
+  console.log(`Client: Waiting to open microphone for provider ${provider.id}`);
   
   // Send configuration before starting microphone
-  const config = getConfig();
+  const config = getConfig(provider);
   // Force interim_results to true for live recording
   config.interim_results = true;
   
   // Update the UI to show interim_results is true
-  document.getElementById('interim_results').checked = true;
+  provider.getElement('.interim_results').checked = true;
   
   // Update the URL display to show interim_results=true
-  updateRequestUrl(config);
+  updateRequestUrl(config, provider);
   
   // Collapse the configuration panel
-  const configContent = document.querySelector('.config-content');
+  const configContent = provider.getElement('.config-content');
   configContent.classList.add('collapsed');
-  const chevron = document.querySelector('.config-header i');
+  const chevron = provider.getElement('.config-header i');
   if (chevron) chevron.style.transform = 'rotate(-90deg)';
   
-  socket.emit("toggle_transcription", { action: "start", config: config });
+  socket.emit("toggle_transcription", { action: "start", config: config, providerId: provider.id });
   
-  await openMicrophone(microphone, socket);
+  await openMicrophone(provider.microphone, socket, provider);
 }
 
-async function stopRecording() {
-  if (isRecording === true) {
-    microphone.stop();
-    microphone.stream.getTracks().forEach((track) => track.stop()); // Stop all tracks
-    socket.emit("toggle_transcription", { action: "stop" });
-    microphone = null;
-    isRecording = false;
-    console.log("Client: Microphone closed");
-    document.body.classList.remove("recording");
+async function stopRecording(provider) {
+  if (provider.isRecording === true) {
+    provider.microphone.stop();
+    provider.microphone.stream.getTracks().forEach((track) => track.stop()); // Stop all tracks
+    socket.emit("toggle_transcription", { action: "stop", providerId: provider.id });
+    provider.microphone = null;
+    provider.isRecording = false;
+    console.log(`Client: Microphone closed for provider ${provider.id}`);
+    document.body.classList.remove(`recording-${provider.id}`);
     
     // Reset interim_results to the checkbox state
-    const config = getConfig();
-    updateRequestUrl(config);
+    const config = getConfig(provider);
+    updateRequestUrl(config, provider);
   }
 }
 
-function getConfig() {
+function getConfig(provider) {
     const config = {};
     
-    const addIfSet = (id) => {
-        const element = document.getElementById(id);
+    const addIfSet = (className) => {
+        const element = provider.getElement(`.${className}`);
+        if (!element) return;
         const value = element.type === 'checkbox' ? element.checked : element.value;
         if (value !== '' && value !== false) {
-            config[id] = value;
+            config[className] = value;
         }
     };
 
@@ -283,56 +324,70 @@ function getConfig() {
     return config;
 }
 
-function toggleConfig() {
-    const header = document.querySelector('.config-header');
-    const content = document.getElementById('configContent');
-    header.classList.toggle('collapsed');
-    content.classList.toggle('collapsed');
+function toggleConfig(element) {
+    const isCollapsed = !element.closest('.config-header').classList.contains('collapsed');
+    
+    // Update all config panels
+    document.querySelectorAll('.config-header').forEach(header => {
+        const content = header.nextElementSibling;
+        if (isCollapsed) {
+            header.classList.add('collapsed');
+            content.classList.add('collapsed');
+            const chevron = header.querySelector('i');
+            if (chevron) chevron.style.transform = 'rotate(-90deg)';
+        } else {
+            header.classList.remove('collapsed');
+            content.classList.remove('collapsed');
+            const chevron = header.querySelector('i');
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
+    });
 }
 
-function updateRequestUrl() {
-    const urlElement = document.getElementById('requestUrl');
-
-    const baseUrl = document.getElementById('baseUrl').value;
+function updateRequestUrl(config, provider) {
+    const urlElement = provider.getElement('.requestUrl');
+    const baseUrl = provider.getElement('.baseUrl')?.value;
+    if (!baseUrl) return;
+    
     const params = new URLSearchParams();
     
     // Only add parameters that are explicitly set
-    const language = document.getElementById('language').value;
+    const language = provider.getElement('.language')?.value;
     if (language) params.append('language', language);
     
-    const model = document.getElementById('model').value;
+    const model = provider.getElement('.model')?.value;
     if (model) params.append('model', model);
     
-    const utteranceEndMs = document.getElementById('utterance_end_ms').value;
+    const utteranceEndMs = provider.getElement('.utterance_end_ms')?.value;
     if (utteranceEndMs) params.append('utterance_end_ms', utteranceEndMs);
     
-    const endpointing = document.getElementById('endpointing').value;
+    const endpointing = provider.getElement('.endpointing')?.value;
     if (endpointing) params.append('endpointing', endpointing);
     
-    const smartFormat = document.getElementById('smart_format').checked;
+    const smartFormat = provider.getElement('.smart_format')?.checked;
     if (smartFormat) params.append('smart_format', 'true');
     
-    const interimResults = document.getElementById('interim_results').checked;
+    const interimResults = provider.getElement('.interim_results')?.checked;
     if (interimResults) params.append('interim_results', 'true');
     
-    const noDelay = document.getElementById('no_delay').checked;
+    const noDelay = provider.getElement('.no_delay')?.checked;
     if (noDelay) params.append('no_delay', 'true');
     
-    const dictation = document.getElementById('dictation').checked;
+    const dictation = provider.getElement('.dictation')?.checked;
     if (dictation) params.append('dictation', 'true');
     
-    const numerals = document.getElementById('numerals').checked;
+    const numerals = provider.getElement('.numerals')?.checked;
     if (numerals) params.append('numerals', 'true');
     
-    const profanityFilter = document.getElementById('profanity_filter').checked;
+    const profanityFilter = provider.getElement('.profanity_filter')?.checked;
     if (profanityFilter) params.append('profanity_filter', 'true');
     
-    const redact = document.getElementById('redact').checked;
+    const redact = provider.getElement('.redact')?.checked;
     if (redact) params.append('redact', 'true');
     
     // Add extra parameters if any
-    const extraParams = document.getElementById('extraParams');
-    if (extraParams && extraParams.value) {
+    const extraParams = provider.getElement('.extraParams');
+    if (extraParams?.value) {
         try {
             const extra = JSON.parse(extraParams.value);
             Object.entries(extra).forEach(([key, value]) => {
@@ -381,11 +436,51 @@ function updateRequestUrl() {
     return outputLines.join('').replace(/&amp;/g, '&');
 }
 
-function toggleExtraParams() {
-    const header = document.querySelector('.extra-params-header');
-    const content = document.getElementById('extraParamsContent');
+function toggleExtraParams(element) {
+    const header = element.closest('.extra-params-header');
+    const content = header.nextElementSibling;
     header.classList.toggle('collapsed');
     content.classList.toggle('collapsed');
+}
+
+function addProvider() {
+    const template = document.getElementById('providerTemplate');
+    const container = document.querySelector('.providers-container');
+    
+    // Create new provider
+    const newId = providers.length;
+    const newProvider = new Provider(newId);
+    providers.push(newProvider);
+    
+    // Clone template
+    const clone = template.content.cloneNode(true);
+    const providerColumn = clone.querySelector('.provider-column');
+    providerColumn.id = `provider-${newId}`;
+    
+    // Add to DOM first so we can query within it
+    container.appendChild(clone);
+    newProvider.column = providerColumn;
+    
+    // Add remove button handler
+    const removeBtn = newProvider.getElement('.remove-provider-button');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', () => newProvider.remove());
+    }
+    
+    // Initialize the new provider
+    initializeProvider(newId);
+}
+
+function removeProvider(id) {
+    const provider = providers.find(p => p.id === id);
+    if (!provider) return;
+    
+    // Stop recording if active
+    if (provider.isRecording) {
+        stopRecording(provider);
+    }
+    
+    provider.remove();
 }
 
 function parseUrlParams(url) {
@@ -435,189 +530,262 @@ function parseUrlParams(url) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    const recordButton = document.getElementById("record");
-    const configPanel = document.querySelector('.config-panel');
-    const resetButton = document.getElementById('resetButton');
-    const clearButton = document.getElementById('clearButton');
-    
-    // Make URL editable
-    const urlElement = document.getElementById('requestUrl');
-    urlElement.contentEditable = true;
-    urlElement.style.cursor = 'text';
-    
-    // Clear button functionality
-    if (clearButton) {
-        clearButton.addEventListener('click', () => {
-            document.getElementById('captions').innerHTML = '';
-            document.getElementById('finalCaptions').innerHTML = '';
-        });
-    }
-    
-    // Reset button functionality
-    if (resetButton) {
-        resetButton.addEventListener('click', resetConfig);
-    }
+    // Add provider button handler
+    document.getElementById('addProviderBtn').addEventListener('click', addProvider);
+});
 
-    // Add event listeners to all config inputs with change tracking
-    const configInputs = document.querySelectorAll('#configForm input');
-    configInputs.forEach(input => {
-        input.addEventListener('change', () => {
-            changedParams.add(input.id);
-            updateRequestUrl(getConfig());
-        });
-        if (input.type === 'text') {
-            input.addEventListener('input', () => {
-                changedParams.add(input.id);
-                updateRequestUrl(getConfig());
-            });
-        }
-    });
-    
-    // Add event listener for extra params
-    document.getElementById('extraParams').addEventListener('blur', () => {
-        try {
-            const extraParams = document.getElementById('extraParams');
-            const rawJson = extraParams.value || '{}';
-            // Parse the raw JSON string to handle duplicate keys
-            const processedExtra = {};
-            const lines = rawJson.split('\n');
-            lines.forEach(line => {
-                const match = line.match(/"([^"]+)":\s*"([^"]+)"/);
-                if (match) {
-                    const [, key, value] = match;
-                    if (processedExtra[key]) {
-                        if (Array.isArray(processedExtra[key])) {
-                            processedExtra[key].push(value);
-                        } else {
-                            processedExtra[key] = [processedExtra[key], value];
-                        }
-                    } else {
-                        processedExtra[key] = value;
-                    }
+function initializeProvider(id) {
+    const provider = providers.find(p => p.id === id);
+    if (!provider) return;
+
+    const recordButton = provider.getElement('.mic-checkbox');
+    const resetButton = provider.getElement('.reset-button');
+    const clearButton = provider.getElement('.clear-button');
+    const urlElement = provider.getElement('.requestUrl');
+    const importButton = provider.getElement('.import-button');
+    const importInput = provider.getElement('.importInput');
+
+    // Initialize record button
+    if (recordButton) {
+        recordButton.addEventListener('change', async () => {
+            if (recordButton.checked) {
+                try {
+                    await startRecording(provider);
+                } catch (error) {
+                    console.error('Failed to start recording:', error);
+                    recordButton.checked = false;
                 }
-            });
-            // Update the textarea with the processed JSON
-            extraParams.value = JSON.stringify(processedExtra, null, 2);
-            // Mark extra params as changed if they're not empty
-            if (Object.keys(processedExtra).length > 0) {
-                changedParams.add('extraParams');
             } else {
-                changedParams.delete('extraParams');
+                await stopRecording(provider);
             }
-            updateRequestUrl();
-        } catch (e) {
-            console.warn('Invalid JSON in extra params');
-        }
-    });
+        });
+    }
 
-    // Add resize listener to update URL formatting when window size changes
-    window.addEventListener('resize', () => {
-        updateRequestUrl(getConfig());
-    });
-
-    // Initialize URL with current config instead of defaults
-    updateRequestUrl(getConfig());
-
-    recordButton.addEventListener("change", async () => {
-        if (recordButton.checked) {
-            try {
-                await startRecording();
-            } catch (error) {
-                console.error("Failed to start recording:", error);
-                recordButton.checked = false;
-            }
-        } else {
-            await stopRecording();
-        }
-    });
-
-    // Initialize extra params as collapsed
-    const extraParamsHeader = document.querySelector('.extra-params-header');
-    extraParamsHeader.classList.add('collapsed');
-
-    // Add import button handler
-    document.getElementById('importButton').addEventListener('click', () => {
-        const importInput = document.getElementById('importInput');
-        const input = importInput.value.trim();
-        if (!input) {
-            alert('Please enter a configuration to import.');
-            return;
-        }
-        
-        try {
-            importConfig(input);
-            // Only clear input if import was successful
-            importInput.value = '';
-        } catch (e) {
-            alert('Invalid configuration format. Please provide a valid JSON object or URL.');
-        }
-    });
-
-    // Add keyboard shortcut (Enter key) for import input
-    document.getElementById('importInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('importButton').click();
-        }
-    });
-
-    // Add event listener for URL editing
-    document.getElementById('requestUrl').addEventListener('input', function(e) {
-        // Store cursor position
-        const selection = window.getSelection();
-        const range = selection.getRangeAt(0);
-        const cursorOffset = range.startOffset;
-        
-        const url = this.textContent.replace(/\s+/g, '').replace(/&amp;/g, '&');
-        const config = parseUrlParams(url);
-        if (config) {
-            // Update form fields based on URL
-            Object.entries(config).forEach(([key, value]) => {
-                const element = document.getElementById(key);
+    // Initialize reset button
+    if (resetButton) {
+        resetButton.addEventListener('click', () => {
+            if (!DEFAULT_CONFIG) return;
+            provider.changedParams.clear();
+            provider.isImported = false;
+            Object.entries(DEFAULT_CONFIG).forEach(([key, value]) => {
+                const element = provider.getElement(`.${key}`);
                 if (element) {
                     if (element.type === 'checkbox') {
                         element.checked = value === 'true' || value === true;
                     } else {
                         element.value = value;
                     }
-                    changedParams.add(key);
                 }
             });
-            
-            // Update extra parameters
-            const extraParams = {};
-            Object.entries(config).forEach(([key, value]) => {
-                if (!document.getElementById(key)) {
-                    extraParams[key] = value;
-                }
-            });
-            document.getElementById('extraParams').value = JSON.stringify(extraParams, null, 2);
-            
-            // Update URL display with proper wrapping and escaping
-            updateRequestUrl();
-            
-            // Restore cursor position
-            try {
-                const urlElement = document.getElementById('requestUrl');
-                const newRange = document.createRange();
-                newRange.setStart(urlElement.firstChild || urlElement, Math.min(cursorOffset, (urlElement.firstChild || urlElement).length));
-                newRange.collapse(true);
-                selection.removeAllRanges();
-                selection.addRange(newRange);
-            } catch (e) {
-                console.warn('Could not restore cursor position:', e);
-            }
-        }
-    });
+            updateRequestUrl(DEFAULT_CONFIG, provider);
+        });
+    }
 
-    // Add event listener for interim_results checkbox
-    const interimResultsCheckbox = document.getElementById('interim_results');
-    if (interimResultsCheckbox) {
-        interimResultsCheckbox.addEventListener('change', function() {
-            // Only update URL if not recording
-            if (!isRecording) {
-                updateRequestUrl(getConfig());
+    // Initialize clear button
+    if (clearButton) {
+        clearButton.addEventListener('click', () => {
+            const finalCaptions = provider.getElement('.finalCaptions');
+            if (finalCaptions) {
+                finalCaptions.innerHTML = '';
             }
         });
     }
-});
+
+    // Initialize import functionality
+    if (importButton && importInput) {
+        importButton.addEventListener('click', () => {
+            const input = importInput.value.trim();
+            if (!input) {
+                alert('Please enter a configuration to import.');
+                return;
+            }
+            
+            try {
+                importConfig(input, provider);
+                importInput.value = '';
+            } catch (e) {
+                alert('Invalid configuration format. Please provide a valid JSON object or URL.');
+            }
+        });
+
+        importInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                importButton.click();
+            }
+        });
+    }
+
+    // Initialize URL editing
+    if (urlElement) {
+        urlElement.addEventListener('input', function(e) {
+            const selection = window.getSelection();
+            const range = selection.getRangeAt(0);
+            const cursorOffset = range.startOffset;
+            
+            const url = this.textContent.replace(/\s+/g, '').replace(/&amp;/g, '&');
+            const config = parseUrlParams(url);
+            if (config) {
+                Object.entries(config).forEach(([key, value]) => {
+                    const element = provider.getElement(`.${key}`);
+                    if (element) {
+                        if (element.type === 'checkbox') {
+                            element.checked = value === 'true' || value === true;
+                        } else {
+                            element.value = value;
+                        }
+                        provider.changedParams.add(key);
+                    }
+                });
+                
+                updateRequestUrl(getConfig(provider), provider);
+                
+                try {
+                    const newRange = document.createRange();
+                    newRange.setStart(urlElement.firstChild || urlElement, Math.min(cursorOffset, (urlElement.firstChild || urlElement).length));
+                    newRange.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(newRange);
+                } catch (e) {
+                    console.warn('Could not restore cursor position:', e);
+                }
+            }
+        });
+    }
+
+    // Initialize input change handlers
+    ['input', 'change'].forEach(eventType => {
+        const inputs = provider.getAllElements('input, select, textarea');
+        inputs.forEach(input => {
+            input.addEventListener(eventType, () => {
+                provider.changedParams.add(input.className);
+                updateRequestUrl(getConfig(provider), provider);
+            });
+        });
+    });
+
+    // Initialize with default config
+    Object.entries(DEFAULT_CONFIG).forEach(([key, value]) => {
+        const element = provider.getElement(`.${key}`);
+        if (element) {
+            if (element.type === 'checkbox') {
+                element.checked = value === 'true' || value === true;
+            } else {
+                element.value = value;
+            }
+        }
+    });
+    updateRequestUrl(DEFAULT_CONFIG, provider);
+}
+    
+    // Make URL editable
+    const urlElement = provider.getElement('.requestUrl');
+    if (urlElement) {
+        urlElement.contentEditable = true;
+        urlElement.style.cursor = 'text';
+        
+        // Add event listener for URL editing
+        urlElement.addEventListener('input', function(e) {
+            // Store cursor position
+            const selection = window.getSelection();
+            const range = selection.getRangeAt(0);
+            const cursorOffset = range.startOffset;
+            
+            const url = this.textContent.replace(/\s+/g, '').replace(/&amp;/g, '&');
+            const config = parseUrlParams(url);
+            if (config) {
+                // Update form fields based on URL
+                Object.entries(config).forEach(([key, value]) => {
+                    const element = provider.getElement(`.${key}`);
+                    if (element) {
+                        if (element.type === 'checkbox') {
+                            element.checked = value === 'true' || value === true;
+                        } else {
+                            element.value = value;
+                        }
+                        provider.changedParams.add(key);
+                    }
+                });
+                
+                // Update extra parameters
+                const extraParams = {};
+                Object.entries(config).forEach(([key, value]) => {
+                    if (!provider.getElement(`.${key}`)) {
+                        extraParams[key] = value;
+                    }
+                });
+                provider.getElement('.extraParams').value = JSON.stringify(extraParams, null, 2);
+                
+                // Update URL display with proper wrapping and escaping
+                updateRequestUrl(getConfig(provider), provider);
+                
+                // Restore cursor position
+                try {
+                    const newRange = document.createRange();
+                    newRange.setStart(urlElement.firstChild || urlElement, Math.min(cursorOffset, (urlElement.firstChild || urlElement).length));
+                    newRange.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(newRange);
+                } catch (e) {
+                    console.warn('Could not restore cursor position:', e);
+                }
+            }
+        });
+    }
+    
+    // Add event listeners to all config inputs with change tracking
+    const configInputs = provider.getAllElements('.config-panel input');
+    configInputs.forEach(input => {
+        input.addEventListener('change', () => {
+            provider.changedParams.add(input.id);
+            updateRequestUrl(getConfig(provider), provider);
+        });
+        if (input.type === 'text') {
+            input.addEventListener('input', () => {
+                provider.changedParams.add(input.id);
+                updateRequestUrl(getConfig(provider), provider);
+            });
+        }
+    });
+    
+    // Add event listener for extra params
+    const extraParams = provider.getElement('.extraParams');
+    if (extraParams) {
+        extraParams.addEventListener('blur', () => {
+            try {
+                const rawJson = extraParams.value || '{}';
+                // Parse the raw JSON string to handle duplicate keys
+                const processedExtra = {};
+                try {
+                    const parsed = JSON.parse(rawJson);
+                    Object.entries(parsed).forEach(([key, value]) => {
+                        processedExtra[key] = value;
+                    });
+                } catch (e) {
+                    console.warn('Invalid JSON in extra params');
+                    return;
+                }
+                
+                // Update the textarea with properly formatted JSON
+                extraParams.value = JSON.stringify(processedExtra, null, 2);
+                
+                // Only mark as changed if there are actual extra params
+                if (Object.keys(processedExtra).length > 0) {
+                    provider.changedParams.add('extraParams');
+                } else {
+                    provider.changedParams.delete('extraParams');
+                }
+                updateRequestUrl(getConfig(provider), provider);
+            } catch (e) {
+                console.warn('Invalid JSON in extra params');
+            }
+        });
+    }
+
+    // Add resize listener to update URL formatting when window size changes
+    window.addEventListener('resize', () => {
+        updateRequestUrl(getConfig(provider), provider);
+    });
+
+    // Initialize with default config
+    updateRequestUrl(getConfig(provider), provider);

@@ -12,7 +12,7 @@
       src="https://cdn.socket.io/4.5.3/socket.io.min.js"
       crossorigin="anonymous"
     ></script>
-    <script src="../static/script.js"></script>
+    <script src="../static/script.js" defer></script>
   </head>
   <body class="">
     <div class="container">
@@ -24,85 +24,117 @@
         </div>
       </div>
 
-      <div class="main-column">
-        <div class="captions-container final-container">
-          <div id="finalCaptions"></div>
-        </div>
-        <div class="config-panel">
-          <div class="url-display">
-            <code id="requestUrl">ws://localhost:8081/v1/listen?...</code>
-          </div>
+      <div class="providers-toolbar">
+        <button id="addProviderBtn" class="add-provider-button">
+          <i class="fas fa-plus"></i> Add STT Provider
+        </button>
+      </div>
 
-          <div class="config-header" onclick="toggleConfig()">
-            <h3>Configuration</h3>
-            <i class="fas fa-chevron-down"></i>
-          </div>
-          <div id="configContent" class="config-content">
-            <form id="configForm">
-              <div class="import-section">
-                <input type="text" id="importInput" placeholder="Paste URL or JSON configuration">
-                <button type="button" id="importButton" class="import-button">
-                  <i class="fas fa-file-import"></i> Import
+      <div class="providers-container">
+        <!-- Template for provider column -->
+        <template id="providerTemplate">
+          <div class="provider-column">
+            <div class="captions-container final-container">
+              <div class="finalCaptions"></div>
+            </div>
+            <div class="config-panel">
+              <div class="provider-header">
+                <select class="provider-select">
+                  <option value="deepgram">Deepgram</option>
+                </select>
+                <button class="remove-provider-button">
+                  <i class="fas fa-times"></i>
                 </button>
               </div>
-              <div class="config-columns">
-                <div class="config-group text-inputs">
-                  <label>Base URL:
-                    <input type="text" id="baseUrl" value="api.deepgram.com" placeholder="api.deepgram.com">
-                  </label>
-                  <label>Model:
-                    <input type="text" id="model" value="nova-3" placeholder="nova-3">
-                  </label>
-                  <label>Language:
-                    <input type="text" id="language" value="en" placeholder="en">
-                  </label>
-                  <label>Utterance End (ms):
-                    <input type="text" id="utterance_end_ms" value="1000" placeholder="1000">
-                  </label>
-                  <label>Endpointing:
-                    <input type="text" id="endpointing" value="10" placeholder="10">
-                  </label>
-                </div>
-                <div class="config-group boolean-inputs">
-                  <label>
-                    <input type="checkbox" id="smart_format" checked> Smart Format
-                  </label>
-                  <label>
-                    <input type="checkbox" id="interim_results" checked> Interim Results
-                  </label>
-                  <label>
-                    <input type="checkbox" id="no_delay" checked> No Delay
-                  </label>
-                  <label>
-                    <input type="checkbox" id="dictation"> Dictation
-                  </label>
-                  <label>
-                    <input type="checkbox" id="numerals"> Numerals
-                  </label>
-                  <label>
-                    <input type="checkbox" id="profanity_filter" checked> Profanity Filter
-                  </label>
-                  <label>
-                    <input type="checkbox" id="redact"> Redact
-                  </label>
-                </div>
+              <div class="url-display">
+                <code class="requestUrl">ws://localhost:8081/v1/listen?...</code>
               </div>
-              <div class="config-group">
-                <div class="extra-params-header" onclick="toggleExtraParams()">
-                  <h4>Extra Parameters (JSON)</h4>
-                  <i class="fas fa-chevron-down"></i>
-                </div>
-                <div id="extraParamsContent" class="extra-params-content collapsed">
-                  <textarea id="extraParams" placeholder='{"key": "value"}'></textarea>
-                </div>
-                <button type="button" id="resetButton" class="reset-button">
-                  <i class="fas fa-undo"></i> Reset to Defaults
-                </button>
+              <div class="config-header" onclick="toggleConfig(this)">
+                <h3>Configuration</h3>
+                <i class="fas fa-chevron-down"></i>
               </div>
-            </form>
-          </div>
+              <div class="config-content">
+                <form class="configForm">
+                  <div class="import-section">
+                    <input type="text" class="importInput" placeholder="Paste URL or JSON configuration">
+                    <button type="button" class="import-button">
+                      <i class="fas fa-file-import"></i> Import
+                    </button>
+                  </div>
+                  <div class="config-columns">
+                    <div class="config-group text-inputs">
+                      <label>Base URL:
+                        <input type="text" class="baseUrl" value="api.deepgram.com" placeholder="api.deepgram.com">
+                      </label>
+                      <label>Model:
+                        <input type="text" class="model" value="nova-3" placeholder="nova-3">
+                      </label>
+                      <label>Language:
+                        <input type="text" class="language" value="en" placeholder="en">
+                      </label>
+                      <label>Utterance End (ms):
+                        <input type="text" class="utterance_end_ms" value="1000" placeholder="1000">
+                      </label>
+                      <label>Endpointing:
+                        <input type="text" class="endpointing" value="10" placeholder="10">
+                      </label>
+                    </div>
+                    <div class="config-group boolean-inputs">
+                      <label>
+                        <input type="checkbox" class="smart_format">
+                        Smart Format
+                      </label>
+                      <label>
+                        <input type="checkbox" class="interim_results" checked>
+                        Interim Results
+                      </label>
+                      <label>
+                        <input type="checkbox" class="no_delay">
+                        No Delay
+                      </label>
+                      <label>
+                        <input type="checkbox" class="dictation">
+                        Dictation
+                      </label>
+                      <label>
+                        <input type="checkbox" class="numerals">
+                        Numerals
+                      </label>
+                      <label>
+                        <input type="checkbox" class="profanity_filter">
+                        Profanity Filter
+                      </label>
+                      <label>
+                        <input type="checkbox" class="redact">
+                        Redact PII
+                      </label>
+                    </div>
+                  </div>
+                  <div class="extra-params">
+                    <div class="extra-params-header" onclick="toggleExtraParams(this)">
+                      <h3>Extra Parameters</h3>
+                      <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="extra-params-content collapsed">
+                      <textarea class="extraParams" placeholder="{}"></textarea>
+                    </div>
+                  </div>
+                  <div class="config-actions">
+                    <button type="button" class="reset-button">
+                      <i class="fas fa-undo"></i> Reset
+                    </button>
+                    <button type="button" class="clear-button">
+                      <i class="fas fa-trash"></i> Clear Results
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+        </div>
         </div>
       </div>
+
+
     </div>
   </body>
 </html>
