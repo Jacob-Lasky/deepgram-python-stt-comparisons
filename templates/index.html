@@ -16,26 +16,15 @@
   </head>
   <body class="">
     <div class="container">
-      <div class="column left-column">
-        <div class="content">
-          <div class="button-container">
-            <input type="checkbox" id="record" class="mic-checkbox" />
-            <label for="record" class="mic-button">
-            </label>
-          </div>
-          
-          <div class="upload-container">
-            <input type="file" id="audioFile" accept="audio/*" style="display: none;">
-            <button id="uploadButton" class="upload-button">
-              <i class="fas fa-upload"></i> Upload Audio
-            </button>
-            <div id="dropZone" class="drop-zone">
-              <i class="fas fa-cloud-upload-alt"></i>
-              <p>Drag & drop audio files here</p>
-            </div>
-          </div>
+      <div class="top-row">
+        <div class="button-container">
+          <input type="checkbox" id="record" class="mic-checkbox" />
+          <label for="record" class="mic-button">
+          </label>
         </div>
+      </div>
 
+      <div class="main-column">
         <div class="url-display">
           <code id="requestUrl">ws://localhost:8081/v1/listen?...</code>
           <div class="url-buttons">
@@ -118,17 +107,8 @@
             </form>
           </div>
         </div>
-      </div>
-
-      <div class="column right-column">
         <div class="captions-container final-container">
           <div id="finalCaptions"></div>
-        </div>
-        <div class="captions-container interim-container">
-          <div id="captions"></div>
-          <button id="clearButton" class="clear-button">
-            <i class="fas fa-trash"></i>
-          </button>
         </div>
       </div>
     </div>

@@ -143,27 +143,7 @@ function importConfig(input) {
 }
 
 socket.on("transcription_update", (data) => {
-  const interimCaptions = document.getElementById("captions");
   const finalCaptions = document.getElementById("finalCaptions");
-  
-  let timeString = "";
-  if (data.timing) {
-    const start = data.timing.start.toFixed(2);
-    const end = data.timing.end.toFixed(2);
-    timeString = `${start}-${end}`;
-  }
-  
-  // Create interim message div
-  const interimDiv = document.createElement("div");
-  const type = data.is_final ? "[Is Final]" : data.utterance_end ? "[Utterance End]" : "[Interim Result]";
-  interimDiv.textContent = data.utterance_end ? 
-    `${type} ${data.transcription}` :
-    `${timeString}   ${type} ${data.transcription}`;
-  interimDiv.className = data.is_final ? "final" : "interim";
-  
-  // Add to interim container
-  interimCaptions.appendChild(interimDiv);
-  interimDiv.scrollIntoView({ behavior: "smooth" });
   
   // Update final container
   if (data.is_final) {
@@ -236,15 +216,15 @@ async function startRecording() {
   
   socket.emit("toggle_transcription", { action: "start", config: config });
   
-  // Display the URL in the interim results container
-  const interimCaptions = document.getElementById("captions");
+  // Display the URL in the final results container
+  const finalCaptions = document.getElementById("finalCaptions");
   const urlDiv = document.createElement("div");
   urlDiv.className = "url-info";
   const url = document.getElementById('requestUrl').textContent
     .replace(/\s+/g, '') // Remove all whitespace including newlines
     .replace(/&amp;/g, '&'); // Fix any HTML-encoded ampersands
   urlDiv.textContent = `Using URL: ${url}`;
-  interimCaptions.appendChild(urlDiv);
+  finalCaptions.appendChild(urlDiv);
   urlDiv.scrollIntoView({ behavior: "smooth" });
   
   await openMicrophone(microphone, socket);
@@ -660,126 +640,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
     });
-
-    // File upload handling
-    const uploadButton = document.getElementById('uploadButton');
-    const audioFile = document.getElementById('audioFile');
-    const dropZone = document.getElementById('dropZone');
-    
-    // Debug: Log when elements are found
-    console.log('Upload button found:', !!uploadButton);
-    console.log('Audio file input found:', !!audioFile);
-    console.log('Drop zone found:', !!dropZone);
-    
-    uploadButton.addEventListener('click', () => {
-        console.log('Upload button clicked');
-        audioFile.click();
-    });
-    
-    // Drag and drop handling
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
-    
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('dragover');
-    });
-    
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        
-        if (e.dataTransfer.files.length === 0) {
-            console.log('No files dropped');
-            return;
-        }
-        
-        const file = e.dataTransfer.files[0];
-        console.log(`Dropped file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
-        
-        processFile(file);
-    });
-    
-    // Click on drop zone to trigger file input
-    dropZone.addEventListener('click', () => {
-        audioFile.click();
-    });
-    
-    // File input change handler
-    audioFile.addEventListener('change', (e) => {
-        if (e.target.files.length === 0) {
-            console.log('No file selected');
-            return;
-        }
-        
-        const file = e.target.files[0];
-        console.log(`Selected file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
-        
-        processFile(file);
-    });
-    
-    // Function to process a file
-    function processFile(file) {
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-          console.log(`File loaded, data length: ${e.target.result.length}`);
-          const fileData = {
-            name: file.name,
-            data: e.target.result
-          };
-          
-          // Get parameters from URL
-          const urlElement = document.getElementById('requestUrl');
-          const urlText = urlElement.textContent;
-          const params = {};
-          
-          // Parse URL parameters
-          const url = new URL(urlText.replace('ws://', 'http://'));
-          // Only include parameters that are explicitly in the URL
-          for (const [key, value] of url.searchParams) {
-            params[key] = value;
-          }
-          
-          console.log(`Sending file upload request with params:`, params);
-          
-          socket.emit('upload_file', { 
-            file: fileData,
-            config: params
-          }, (result) => {
-            console.log(`Received response:`, result);
-            if (result.error) {
-              console.error('Upload error:', result.error);
-              return;
-            }
-            
-            // Display transcription
-            const transcript = result.results?.channels[0]?.alternatives[0]?.transcript;
-            if (transcript) {
-              const finalCaptions = document.getElementById('finalCaptions');
-              const finalDiv = document.createElement('span');
-              finalDiv.textContent = transcript + ' ';
-              finalDiv.className = 'final';
-              finalCaptions.appendChild(finalDiv);
-              finalDiv.scrollIntoView({ behavior: 'smooth' });
-            }
-          });
-        };
-        
-        reader.onerror = function(e) {
-          console.error('Error reading file:', e);
-        };
-        
-        reader.onprogress = function(e) {
-          if (e.lengthComputable) {
-            console.log(`Reading file: ${Math.round((e.loaded / e.total) * 100)}%`);
-          }
-        };
-        
-        console.log('Starting to read file...');
-        reader.readAsDataURL(file);
-    }
 
     // Add event listener for interim_results checkbox
     const interimResultsCheckbox = document.getElementById('interim_results');
