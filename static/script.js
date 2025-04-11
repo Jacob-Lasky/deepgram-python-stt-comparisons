@@ -24,7 +24,7 @@ let DEFAULT_CONFIG = {
     "extra": {}
 };
 
-const socket_port = 5001;
+const socket_port = 8001;
 socket = io(
   "http://" + window.location.hostname + ":" + socket_port.toString()
 );
