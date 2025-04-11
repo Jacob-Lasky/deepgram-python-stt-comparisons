@@ -214,18 +214,13 @@ async function startRecording() {
   // Update the URL display to show interim_results=true
   updateRequestUrl(config);
   
-  socket.emit("toggle_transcription", { action: "start", config: config });
+  // Collapse the configuration panel
+  const configContent = document.querySelector('.config-content');
+  configContent.classList.add('collapsed');
+  const chevron = document.querySelector('.config-header i');
+  if (chevron) chevron.style.transform = 'rotate(-90deg)';
   
-  // Display the URL in the final results container
-  const finalCaptions = document.getElementById("finalCaptions");
-  const urlDiv = document.createElement("div");
-  urlDiv.className = "url-info";
-  const url = document.getElementById('requestUrl').textContent
-    .replace(/\s+/g, '') // Remove all whitespace including newlines
-    .replace(/&amp;/g, '&'); // Fix any HTML-encoded ampersands
-  urlDiv.textContent = `Using URL: ${url}`;
-  finalCaptions.appendChild(urlDiv);
-  urlDiv.scrollIntoView({ behavior: "smooth" });
+  socket.emit("toggle_transcription", { action: "start", config: config });
   
   await openMicrophone(microphone, socket);
 }
@@ -361,7 +356,7 @@ function updateRequestUrl() {
     const maxLineLength = Math.floor((containerWidth - safetyMargin) / avgCharWidth);
     
     // Format URL with line breaks
-    const baseUrlDisplay = isRecording ? `ws://${baseUrl}/v1/listen?` : `http://${baseUrl}/v1/listen?`;
+    const baseUrlDisplay = `ws://${baseUrl}/v1/listen?`;
     const pairs = params.toString().split('&');
     let currentLine = baseUrlDisplay;
     const outputLines = [];
@@ -439,20 +434,10 @@ function parseUrlParams(url) {
     }
 }
 
-function simplifyUrl() {
-    // Clear import state and changed params
-    isImported = false;
-    changedParams.clear();
-    // Update URL to show only non-default params
-    updateRequestUrl(getConfig());
-}
-
 document.addEventListener("DOMContentLoaded", () => {
     const recordButton = document.getElementById("record");
     const configPanel = document.querySelector('.config-panel');
-    const copyButton = document.getElementById('copyUrl');
     const resetButton = document.getElementById('resetButton');
-    const simplifyButton = document.getElementById('simplifyButton');
     const clearButton = document.getElementById('clearButton');
     
     // Make URL editable
@@ -472,22 +457,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (resetButton) {
         resetButton.addEventListener('click', resetConfig);
     }
-    
-    // Simplify button functionality
-    if (simplifyButton) {
-        simplifyButton.addEventListener('click', simplifyUrl);
-    }
-    
-    // Copy URL functionality
-    copyButton.addEventListener('click', () => {
-        const url = document.getElementById('requestUrl').textContent
-            .replace(/\s+/g, '') // Remove all whitespace including newlines
-            .replace(/&amp;/g, '&'); // Fix any HTML-encoded ampersands
-        navigator.clipboard.writeText(url).then(() => {
-            copyButton.classList.add('copied');
-            setTimeout(() => copyButton.classList.remove('copied'), 1000);
-        });
-    });
 
     // Add event listeners to all config inputs with change tracking
     const configInputs = document.querySelectorAll('#configForm input');
