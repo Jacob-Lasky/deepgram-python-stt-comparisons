@@ -63,12 +63,19 @@ def initialize_provider(provider_name: str, config_options=None):
 # SocketIO event handlers
 @socketio.on("audio_stream")
 def handle_audio_stream(data):
+    logging.info(f"Received audio stream data: {type(data)} with keys {data.keys()}")
     if active_provider and active_provider.is_connected:
-        active_provider.send(data)
+        # Extract just the audio data from the message
+        audio_data = data.get('data')
+        if audio_data:
+            logging.info(f"Sending audio data of type {type(audio_data)} to provider {data['providerId']}")
+            active_provider.send(audio_data)
 
 @socketio.on("toggle_transcription")
 def handle_toggle_transcription(data):
     global active_provider
+    
+    logging.info(f"Received toggle_transcription event with data: {data}")
     
     action = data.get("action")
     provider_name = data.get("provider", "deepgram")
@@ -76,14 +83,20 @@ def handle_toggle_transcription(data):
     if action == "start":
         logging.info(f"Starting {provider_name} connection")
         config = data.get("config", {})
+        logging.info(f"Using config: {config}")
         
         if initialize_provider(provider_name, config):
             active_provider.start(config)
+            logging.info(f"Started {provider_name} provider successfully")
+        else:
+            logging.error(f"Failed to initialize {provider_name} provider")
     
     elif action == "stop" and active_provider:
         logging.info(f"Stopping {provider_name} connection")
         active_provider.stop()
         active_provider = None
+    else:
+        logging.warning(f"Invalid action '{action}' or no active provider")
 
 @socketio.on("connect")
 def server_connect():

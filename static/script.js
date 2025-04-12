@@ -1,5 +1,136 @@
 let providers = [];
 let socket;
+const socket_port = 8001;
+
+// Default configuration
+const DEFAULT_CONFIG = {
+    "base_url": "api.deepgram.com",
+    "model": "nova-3",
+    "language": "en",
+    "utterance_end_ms": "1000",
+    "endpointing": "10",
+    "smart_format": false,
+    "interim_results": true,
+    "no_delay": false,
+    "dictation": false,
+    "numerals": false,
+    "profanity_filter": false,
+    "redact": false,
+    "extra": {}
+};
+
+// Initialize everything when DOM is loaded
+document.addEventListener("DOMContentLoaded", async () => {
+    console.log('Initializing application...');
+
+    // Initialize socket first
+    console.log('Initializing socket connection...');
+    socket = io("http://" + window.location.hostname + ":" + socket_port.toString());
+
+    // Set up socket event handlers
+    socket.on('connect', () => {
+        console.log('Client: Connected to server');
+        console.log('Socket ID:', socket.id);
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client: Disconnected from server');
+        // Stop recording for all providers
+        providers.forEach(provider => {
+            if (provider.isRecording) {
+                const recordButton = provider.getElement('.mic-checkbox');
+                if (recordButton) recordButton.checked = false;
+                stopRecording(provider);
+            }
+        });
+    });
+
+    socket.on('error', (error) => {
+        console.error('Socket error:', error);
+    });
+
+    // Set up transcription update handler
+    socket.on("transcription_update", (data) => {
+        const provider = providers.find(p => p.id === data.providerId);
+        if (!provider) return;
+        
+        const finalCaptions = provider.getElement(".finalCaptions");
+        if (!finalCaptions) return;
+        
+        let interimSpan = provider.getElement(".interim");
+        if (!interimSpan) {
+            interimSpan = document.createElement("span");
+            interimSpan.className = "interim";
+            finalCaptions.appendChild(interimSpan);
+        }
+        
+        if (data.is_final) {
+            interimSpan.className = "interim-final";
+            finalCaptions.appendChild(interimSpan);
+        }
+        interimSpan.textContent = data.transcription + " ";
+        interimSpan.scrollIntoView({ behavior: "smooth" });
+    });
+
+    // Add provider button handler
+    const addProviderBtn = document.getElementById('addProviderBtn');
+    if (addProviderBtn) {
+        console.log('Found add provider button, adding click handler');
+        addProviderBtn.addEventListener('click', () => {
+            console.log('Add provider button clicked');
+            addProvider();
+        });
+    } else {
+        console.error('Could not find add provider button');
+    }
+
+    // Initialize default configuration
+    try {
+        const response = await fetch('../config/defaults.json');
+        if (response.ok) {
+            const config = await response.json();
+            Object.assign(DEFAULT_CONFIG, config);
+        }
+    } catch (error) {
+        console.warn('Could not load default configuration, using built-in defaults:', error);
+    }
+    console.log('Using configuration:', DEFAULT_CONFIG);
+
+    // Add main record button handler
+    const mainRecordButton = document.getElementById('record');
+    if (mainRecordButton) {
+        console.log('Found main record button, adding change handler');
+        mainRecordButton.addEventListener('change', async () => {
+            console.log('Main record button changed:', mainRecordButton.checked);
+            if (!socket?.connected) {
+                console.error('Socket not connected');
+                mainRecordButton.checked = false;
+                return;
+            }
+
+            for (const provider of providers) {
+                try {
+                    if (mainRecordButton.checked) {
+                        console.log('Starting recording for provider', provider.id);
+                        await startRecording(provider);
+                    } else {
+                        console.log('Stopping recording for provider', provider.id);
+                        await stopRecording(provider);
+                    }
+                } catch (error) {
+                    console.error('Error with provider', provider.id, error);
+                    mainRecordButton.checked = false;
+                }
+            }
+        });
+    } else {
+        console.error('Could not find main record button');
+    }
+});
 
 class Provider {
   constructor(id) {
@@ -36,40 +167,6 @@ class Provider {
   }
 }
 
-let DEFAULT_CONFIG = {
-    "base_url": "api.deepgram.com",
-    "model": "nova-3",
-    "language": "en",
-    "utterance_end_ms": "1000",
-    "endpointing": "10",
-    "smart_format": false,
-    "interim_results": true,
-    "no_delay": false,
-    "dictation": false,
-    "numerals": false,
-    "profanity_filter": false,
-    "redact": false,
-    "extra": {}
-};
-
-const socket_port = 8001;
-socket = io(
-  "http://" + window.location.hostname + ":" + socket_port.toString()
-);
-
-// Fetch default configuration
-fetch('../config/defaults.json')
-  .then(response => response.json())
-  .then(config => {
-    DEFAULT_CONFIG = config;
-    // Initialize URL with current config
-    updateRequestUrl(getConfig());
-  })
-  .catch(error => {
-    console.error('Error loading default configuration:', error);
-    // Initialize URL with current config
-    updateRequestUrl(getConfig());
-  });
 
 function setDefaultValues(provider) {
     if (!DEFAULT_CONFIG) return;
@@ -307,8 +404,8 @@ function getConfig(provider) {
     addIfSet('redact');
 
     // Add extra parameters
-    const extraParams = document.getElementById('extraParams');
-    if (extraParams && extraParams.value) {
+    const extraParams = provider.getElement('.extraParams');
+    if (extraParams?.value) {
         try {
             const extra = JSON.parse(extraParams.value);
             Object.entries(extra).forEach(([key, value]) => {
@@ -444,31 +541,52 @@ function toggleExtraParams(element) {
 }
 
 function addProvider() {
+    console.log('Adding new provider...');
     const template = document.getElementById('providerTemplate');
+    if (!template) {
+        console.error('Provider template not found');
+        return;
+    }
+
     const container = document.querySelector('.providers-container');
-    
-    // Create new provider
-    const newId = providers.length;
-    const newProvider = new Provider(newId);
-    providers.push(newProvider);
-    
-    // Clone template
-    const clone = template.content.cloneNode(true);
-    const providerColumn = clone.querySelector('.provider-column');
-    providerColumn.id = `provider-${newId}`;
-    
-    // Add to DOM first so we can query within it
-    container.appendChild(clone);
-    newProvider.column = providerColumn;
-    
-    // Add remove button handler
-    const removeBtn = newProvider.getElement('.remove-provider-button');
-    if (removeBtn) {
-        removeBtn.addEventListener('click', () => newProvider.remove());
+    if (!container) {
+        console.error('Providers container not found');
+        return;
     }
     
-    // Initialize the new provider
-    initializeProvider(newId);
+    try {
+        // Create new provider
+        const newId = providers.length;
+        const newProvider = new Provider(newId);
+        providers.push(newProvider);
+        
+        console.log(`Created new provider with ID ${newId}`);
+        
+        // Clone template
+        const clone = template.content.cloneNode(true);
+        const providerColumn = clone.querySelector('.provider-column');
+        if (!providerColumn) {
+            throw new Error('Provider column not found in template');
+        }
+        
+        providerColumn.id = `provider-${newId}`;
+        
+        // Add to DOM first so we can query within it
+        container.appendChild(clone);
+        newProvider.column = providerColumn;
+        
+        // Add remove button handler
+        const removeBtn = newProvider.getElement('.remove-provider-button');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => newProvider.remove());
+        }
+        
+        // Initialize the new provider
+        initializeProvider(newId);
+        console.log('Provider added successfully');
+    } catch (error) {
+        console.error('Error adding provider:', error);
+    }
 }
 
 function removeProvider(id) {
@@ -529,10 +647,19 @@ function parseUrlParams(url) {
     }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    // Add provider button handler
-    document.getElementById('addProviderBtn').addEventListener('click', addProvider);
-});
+    // Fetch default configuration
+    fetch('../config/defaults.json')
+        .then(response => response.json())
+        .then(config => {
+            DEFAULT_CONFIG = config;
+            // Initialize URL with current config
+            updateRequestUrl(getConfig());
+        })
+        .catch(error => {
+            console.error('Error loading default configuration:', error);
+            // Initialize URL with current config
+            updateRequestUrl(getConfig());
+        });
 
 function initializeProvider(id) {
     const provider = providers.find(p => p.id === id);

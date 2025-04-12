@@ -398,6 +398,18 @@ h1 {
   border-radius: 4px;
 }
 
+.provider-header .button-container {
+  margin: 0;
+  padding: 0;
+}
+
+.provider-header .mic-button {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+}
+
 .provider-select {
   flex: 1;
   padding: 4px 8px;
