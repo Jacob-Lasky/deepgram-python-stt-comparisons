@@ -26,6 +26,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Initialize socket first
     console.log('Initializing socket connection...');
     socket = io("http://" + window.location.hostname + ":" + socket_port.toString());
+    
+    // Add the first provider automatically
+    setTimeout(() => {
+        if (providers.length === 0) {
+            addProvider();
+        }
+    }, 500);
 
     // Set up socket event handlers
     socket.on('connect', () => {
@@ -561,6 +568,15 @@ function addProvider() {
         
         providerColumn.id = `provider-${newId}`;
         
+        // Add provider ID to the column for visual identification
+        const providerHeader = clone.querySelector('.provider-header');
+        if (providerHeader) {
+            const providerIdLabel = document.createElement('span');
+            providerIdLabel.className = 'provider-id-label';
+            providerIdLabel.textContent = `Provider #${newId}`;
+            providerHeader.insertBefore(providerIdLabel, providerHeader.firstChild);
+        }
+        
         // Add to DOM first so we can query within it
         container.appendChild(clone);
         newProvider.column = providerColumn;
@@ -588,7 +604,17 @@ function removeProvider(id) {
         stopRecording(provider);
     }
     
+    // Tell the server to stop this provider
+    socket.emit("toggle_transcription", { action: "stop", providerId: id });
+    
+    // Remove from the UI
     provider.remove();
+    
+    // Remove from the providers array
+    const index = providers.findIndex(p => p.id === id);
+    if (index !== -1) {
+        providers.splice(index, 1);
+    }
 }
 
 function parseUrlParams(url) {
