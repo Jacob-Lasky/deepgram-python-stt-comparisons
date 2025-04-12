@@ -343,7 +343,14 @@ h1 {
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.add-provider-button.disabled,
+.add-provider-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #999;
 }
 
 .add-provider-button:hover {

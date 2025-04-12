@@ -130,6 +130,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Add main record button handler
     const mainRecordButton = document.getElementById('record');
+    
     if (mainRecordButton) {
         console.log('Found main record button, adding change handler');
         mainRecordButton.addEventListener('change', async () => {
@@ -138,6 +139,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                 console.error('Socket not connected');
                 mainRecordButton.checked = false;
                 return;
+            }
+            
+            // Disable/enable the Add Provider button based on recording state
+            if (addProviderBtn) {
+                if (mainRecordButton.checked) {
+                    addProviderBtn.disabled = true;
+                    addProviderBtn.classList.add('disabled');
+                } else {
+                    addProviderBtn.disabled = false;
+                    addProviderBtn.classList.remove('disabled');
+                }
             }
 
             for (const provider of providers) {
@@ -152,6 +164,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                 } catch (error) {
                     console.error('Error with provider', provider.id, error);
                     mainRecordButton.checked = false;
+                    // Re-enable the Add Provider button if there's an error
+                    if (addProviderBtn) {
+                        addProviderBtn.disabled = false;
+                        addProviderBtn.classList.remove('disabled');
+                    }
                 }
             }
         });
@@ -552,8 +569,13 @@ function addProvider() {
     }
     
     try {
-        // Create new provider
-        const newId = providers.length;
+        // Find the next available ID that isn't already in use
+        let newId = 0;
+        const usedIds = providers.map(p => p.id);
+        while (usedIds.includes(newId)) {
+            newId++;
+        }
+
         const newProvider = new Provider(newId);
         providers.push(newProvider);
         
@@ -567,15 +589,6 @@ function addProvider() {
         }
         
         providerColumn.id = `provider-${newId}`;
-        
-        // Add provider ID to the column for visual identification
-        const providerHeader = clone.querySelector('.provider-header');
-        if (providerHeader) {
-            const providerIdLabel = document.createElement('span');
-            providerIdLabel.className = 'provider-id-label';
-            providerIdLabel.textContent = `Provider #${newId}`;
-            providerHeader.insertBefore(providerIdLabel, providerHeader.firstChild);
-        }
         
         // Add to DOM first so we can query within it
         container.appendChild(clone);
@@ -727,10 +740,13 @@ function initializeProvider(id) {
     // Initialize clear button
     if (clearButton) {
         clearButton.addEventListener('click', () => {
-            const finalCaptions = provider.getElement('.finalCaptions');
-            if (finalCaptions) {
-                finalCaptions.innerHTML = '';
-            }
+            // Clear results from ALL providers
+            providers.forEach(p => {
+                const finalCaptions = p.getElement('.finalCaptions');
+                if (finalCaptions) {
+                    finalCaptions.innerHTML = '';
+                }
+            });
         });
     }
 
