@@ -55,25 +55,46 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Set up transcription update handler
     socket.on("transcription_update", (data) => {
+        console.log('Received transcription update:', data);
+        
         const provider = providers.find(p => p.id === data.providerId);
-        if (!provider) return;
+        if (!provider) {
+            console.error('Provider not found for ID:', data.providerId);
+            return;
+        }
         
         const finalCaptions = provider.getElement(".finalCaptions");
-        if (!finalCaptions) return;
-        
-        let interimSpan = provider.getElement(".interim");
-        if (!interimSpan) {
-            interimSpan = document.createElement("span");
-            interimSpan.className = "interim";
-            finalCaptions.appendChild(interimSpan);
+        if (!finalCaptions) {
+            console.error('Final captions container not found');
+            return;
         }
         
+        // Update final container
         if (data.is_final) {
-            interimSpan.className = "interim-final";
-            finalCaptions.appendChild(interimSpan);
+            console.log('Processing FINAL transcription:', data.transcription);
+            // Remove any existing interim span
+            const existingInterim = finalCaptions.querySelector('.interim-final');
+            if (existingInterim) {
+                existingInterim.remove();
+            }
+            // For final results, append as a new span
+            const finalDiv = document.createElement("span");
+            finalDiv.textContent = data.transcription + " ";
+            finalDiv.className = "final";
+            finalCaptions.appendChild(finalDiv);
+            finalDiv.scrollIntoView({ behavior: "smooth" });
+        } else {
+            console.log('Processing INTERIM transcription:', data.transcription);
+            // For interim results, update or create the interim span
+            let interimSpan = finalCaptions.querySelector('.interim-final');
+            if (!interimSpan) {
+                interimSpan = document.createElement("span");
+                interimSpan.className = "interim-final";
+                finalCaptions.appendChild(interimSpan);
+            }
+            interimSpan.textContent = data.transcription + " ";
+            interimSpan.scrollIntoView({ behavior: "smooth" });
         }
-        interimSpan.textContent = data.transcription + " ";
-        interimSpan.scrollIntoView({ behavior: "smooth" });
     });
 
     // Add provider button handler
@@ -275,38 +296,7 @@ function importConfig(input, provider) {
     updateRequestUrl(getConfig(provider), provider);
 }
 
-socket.on("transcription_update", (data) => {
-  const provider = providers.find(p => p.id === data.providerId);
-  if (!provider) return;
-  
-  const finalCaptions = provider.getElement(".finalCaptions");
-  if (!finalCaptions) return;
-  
-  // Update final container
-  if (data.is_final) {
-    // Remove any existing interim span
-    const existingInterim = finalCaptions.querySelector('.interim-final');
-    if (existingInterim) {
-      existingInterim.remove();
-    }
-    // For final results, append as a new span
-    const finalDiv = document.createElement("span");
-    finalDiv.textContent = data.transcription + " ";
-    finalDiv.className = "final";
-    finalCaptions.appendChild(finalDiv);
-    finalDiv.scrollIntoView({ behavior: "smooth" });
-  } else if (!data.utterance_end) {
-    // For interim results, update or create the interim span
-    let interimSpan = finalCaptions.querySelector('.interim-final');
-    if (!interimSpan) {
-      interimSpan = document.createElement("span");
-      interimSpan.className = "interim-final";
-      finalCaptions.appendChild(interimSpan);
-    }
-    interimSpan.textContent = data.transcription + " ";
-    interimSpan.scrollIntoView({ behavior: "smooth" });
-  }
-});
+
 
 async function getMicrophone() {
   try {

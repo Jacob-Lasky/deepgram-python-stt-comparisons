@@ -27,6 +27,18 @@ active_provider = None
 
 def emit_transcription(result):
     """Callback function for transcription updates."""
+    # Add providerId to the result
+    if active_provider:
+        result["providerId"] = 0  # Use 0 as the default provider ID
+    
+    # Log the full result being sent to the client
+    logging.info(f"Emitting transcription to client: {result}")
+    
+    # Ensure is_final is a boolean
+    if "is_final" in result:
+        result["is_final"] = bool(result["is_final"])
+        logging.info(f"is_final type: {type(result['is_final'])}, value: {result['is_final']}")
+    
     socketio.emit("transcription_update", result)
 
 # Flask routes

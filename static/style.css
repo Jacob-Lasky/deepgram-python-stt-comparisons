@@ -98,15 +98,15 @@ body {
 }
 
 .interim {
-  color: #fff;
+  color: #999; /* Grey for interim results */
 }
 
 .final {
-  color: #13ef95;
+  color: #13ef95; /* Bright green for final results */
 }
 
 .interim-final {
-  color: rgba(255, 255, 255, 0.7);
+  color: #999; /* Grey for interim results */
 }
 
 h1 {
