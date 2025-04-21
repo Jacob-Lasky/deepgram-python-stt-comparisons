@@ -83,12 +83,15 @@ def handle_audio_stream(data):
     logging.info(f"Received audio stream data: {type(data)} with keys {data.keys()}")
     # Extract just the audio data from the message
     audio_data = data.get('data')
-    if audio_data:
-        # Send to all active providers
-        for provider_id, provider in active_providers.items():
-            if provider.is_connected:
-                logging.info(f"Sending audio data to provider {provider_id}")
-                provider.send(audio_data)
+    provider_id = data.get('providerId')
+    
+    if audio_data and provider_id is not None:
+        # Only send to the specific provider it was intended for
+        if provider_id in active_providers and active_providers[provider_id].is_connected:
+            logging.info(f"Sending audio data to provider {provider_id}")
+            active_providers[provider_id].send(audio_data)
+    else:
+        logging.warning("Received audio data without provider ID or audio data")
 
 @socketio.on("toggle_transcription")
 def handle_toggle_transcription(data):
