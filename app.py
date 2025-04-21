@@ -57,6 +57,7 @@ def initialize_provider(provider_name: str, provider_id: int, config_options=Non
         active_providers[provider_id].stop()
     
     if provider_name == "deepgram":
+        # get API key from .env file
         api_key = os.getenv("DEEPGRAM_API_KEY")
         if not api_key:
             logging.error("No Deepgram API key found in environment")
