@@ -2,28 +2,52 @@ let providers = [];
 let socket;
 const socket_port = 8001;
 
-// Default configuration
-const DEFAULT_CONFIG = {
-    "base_url": "api.deepgram.com",
-    "model": "nova-3",
-    "language": "en",
-    "utterance_end_ms": "1000",
-    "endpointing": "10",
-    "smart_format": false,
-    "interim_results": true,
-    "no_delay": false,
-    "dictation": false,
-    "numerals": false,
-    "profanity_filter": false,
-    "redact": false,
-    "extra": {}
-};
+// Provider configurations
+let PROVIDER_CONFIGS = {};
+let DEFAULT_CONFIG = {};
+
+// Load provider configurations
+async function loadProviderConfigs() {
+    try {
+        // Load Deepgram config
+        const deepgramResponse = await fetch('../static/config/providers/deepgram.json');
+        if (deepgramResponse.ok) {
+            PROVIDER_CONFIGS.deepgram = await deepgramResponse.json();
+        }
+        
+        // Load Microsoft config
+        const microsoftResponse = await fetch('../static/config/providers/microsoft.json');
+        if (microsoftResponse.ok) {
+            PROVIDER_CONFIGS.microsoft = await microsoftResponse.json();
+        }
+        
+        // Use Deepgram as default for backward compatibility
+        if (PROVIDER_CONFIGS.deepgram) {
+            DEFAULT_CONFIG = PROVIDER_CONFIGS.deepgram;
+        }
+        
+        console.log('Loaded provider configurations:', PROVIDER_CONFIGS);
+    } catch (error) {
+        console.error('Error loading provider configurations:', error);
+        // Fallback default configuration
+        DEFAULT_CONFIG = {
+            "language": "en",
+            "interim_results": true,
+            "base_url": "api.deepgram.com",
+            "model": "nova-3",
+            "extra": {}
+        };
+    }
+}
 
 // Initialize everything when DOM is loaded
 document.addEventListener("DOMContentLoaded", async () => {
     console.log('Initializing application...');
+    
+    // Load provider configurations first
+    await loadProviderConfigs();
 
-    // Initialize socket first
+    // Initialize socket
     console.log('Initializing socket connection...');
     socket = io("http://" + window.location.hostname + ":" + socket_port.toString());
     
@@ -214,39 +238,106 @@ class Provider {
 
 
 function setDefaultValues(provider) {
-    if (!DEFAULT_CONFIG) return;
+    // Get the current provider type
+    const providerType = provider.getElement('.provider-select')?.value;
+    if (!providerType) return;
     
-    // Set text input defaults
-    ['baseUrl', 'model', 'language', 'utterance_end_ms', 'endpointing'].forEach(className => {
-        const element = provider.getElement(`.${className}`);
-        if (element && DEFAULT_CONFIG[className]) {
-            element.value = DEFAULT_CONFIG[className];
-        }
-    });
+    // Fetch provider-specific configuration
+    fetch(`../static/config/providers/${providerType}.json`)
+        .then(response => response.json())
+        .then(config => {
+            // Apply the provider-specific configuration to the form
+            for (const [key, value] of Object.entries(config)) {
+                if (typeof value === 'boolean') {
+                    const checkbox = provider.getElement(`.${key}`);
+                    if (checkbox) checkbox.checked = value;
+                } else if (key !== 'extra') {
+                    const input = provider.getElement(`.${key}`);
+                    if (input) input.value = value;
+                }
+            }
+            
+            // Update extra params if present
+            if (config.extra && Object.keys(config.extra).length > 0) {
+                const extraParams = provider.getElement('.extraParams');
+                if (extraParams) {
+                    extraParams.value = JSON.stringify(config.extra, null, 2);
+                }
+            }
+            
+            // Update the URL display
+            updateRequestUrl(getConfig(provider), provider);
+        })
+        .catch(error => {
+            console.error(`Error loading ${providerType} configuration:`, error);
+            // Fallback to default values if available
+            if (DEFAULT_CONFIG) {
+                // Set text input defaults
+                ['baseUrl', 'model', 'language', 'utterance_end_ms', 'endpointing', 'microsoft_language'].forEach(className => {
+                    const element = provider.getElement(`.${className}`);
+                    if (element && DEFAULT_CONFIG[className]) {
+                        element.value = DEFAULT_CONFIG[className];
+                    }
+                });
 
-    // Set checkbox defaults
-    ['smart_format', 'interim_results', 'no_delay', 'dictation', 
-     'numerals', 'profanity_filter', 'redact'].forEach(className => {
-        const element = provider.getElement(`.${className}`);
-        if (element && DEFAULT_CONFIG[className] !== undefined) {
-            element.checked = DEFAULT_CONFIG[className];
-        }
-    });
+                // Set checkbox defaults
+                ['smart_format', 'interim_results', 'no_delay', 'dictation', 
+                 'numerals', 'profanity_filter', 'redact'].forEach(className => {
+                    const element = provider.getElement(`.${className}`);
+                    if (element && DEFAULT_CONFIG[className] !== undefined) {
+                        element.checked = DEFAULT_CONFIG[className];
+                    }
+                });
 
-    // Set extra params default
-    const extraParams = provider.getElement('.extraParams');
-    if (extraParams) {
-        extraParams.value = JSON.stringify(DEFAULT_CONFIG.extra || {}, null, 2);
-    }
+                // Set extra params default
+                const extraParams = provider.getElement('.extraParams');
+                if (extraParams) {
+                    extraParams.value = JSON.stringify(DEFAULT_CONFIG.extra || {}, null, 2);
+                }
+            }
+        });
 }
 
 function resetConfig(provider) {
-    if (!DEFAULT_CONFIG) return;
     // Clear changed parameters tracking and import state
     provider.changedParams.clear();
     provider.isImported = false;
-    setDefaultValues(provider);
-    updateRequestUrl(getConfig(provider), provider);
+    
+    // Get the current provider type
+    const providerType = provider.getElement('.provider-select').value;
+    
+    // Fetch provider-specific configuration
+    fetch(`../static/config/providers/${providerType}.json`)
+        .then(response => response.json())
+        .then(config => {
+            // Apply the provider-specific configuration to the form
+            for (const [key, value] of Object.entries(config)) {
+                if (typeof value === 'boolean') {
+                    const checkbox = provider.getElement(`.${key}`);
+                    if (checkbox) checkbox.checked = value;
+                } else if (key !== 'extra') {
+                    const input = provider.getElement(`.${key}`);
+                    if (input) input.value = value;
+                }
+            }
+            
+            // Update extra params if present
+            if (config.extra && Object.keys(config.extra).length > 0) {
+                const extraParams = provider.getElement('.extraParams');
+                if (extraParams) {
+                    extraParams.value = JSON.stringify(config.extra, null, 2);
+                }
+            }
+            
+            // Update the URL display
+            updateRequestUrl(getConfig(provider), provider);
+        })
+        .catch(error => {
+            console.error(`Error loading ${providerType} configuration:`, error);
+            // Fallback to default values
+            setDefaultValues(provider);
+            updateRequestUrl(getConfig(provider), provider);
+        });
 }
 
 function importConfig(input, provider) {
@@ -394,44 +485,45 @@ async function stopRecording(provider) {
 
 function getConfig(provider) {
     const config = {};
+    const providerType = provider.getElement('.provider-select')?.value;
     
-    const addIfSet = (className) => {
-        const element = provider.getElement(`.${className}`);
-        if (!element) return;
-        const value = element.type === 'checkbox' ? element.checked : element.value;
-        if (value !== '' && value !== false) {
-            config[className] = value;
+    // Get text inputs
+    const textInputs = provider.getAllElements('.text-inputs input[type="text"]');
+    textInputs.forEach(input => {
+        if (input.value) {
+            config[input.className] = input.value;
         }
-    };
-
-    addIfSet('baseUrl');
-    addIfSet('language');
-    addIfSet('model');
-    addIfSet('utterance_end_ms');
-    addIfSet('endpointing');
-    addIfSet('smart_format');
-    addIfSet('interim_results');
-    addIfSet('no_delay');
-    addIfSet('dictation');
-    addIfSet('numerals');
-    addIfSet('profanity_filter');
-    addIfSet('redact');
-
-    // Add extra parameters
-    const extraParams = provider.getElement('.extraParams');
-    if (extraParams?.value) {
+    });
+    
+    // Get boolean inputs
+    const booleanInputs = provider.getAllElements('.boolean-inputs input[type="checkbox"]');
+    booleanInputs.forEach(input => {
+        config[input.className] = input.checked;
+    });
+    
+    // Get extra parameters
+    const extraParamsInput = provider.getElement('.extraParams');
+    if (extraParamsInput && extraParamsInput.value) {
         try {
-            const extra = JSON.parse(extraParams.value);
-            Object.entries(extra).forEach(([key, value]) => {
-                if (value !== undefined && value !== '') {
-                    config[key] = value;
-                }
-            });
+            const extraParams = JSON.parse(extraParamsInput.value);
+            config.extra = extraParams;
         } catch (e) {
-            console.error('Error parsing extra parameters:', e);
+            console.error('Invalid JSON in extra parameters:', e);
+            // Use empty object as fallback
+            config.extra = {};
+        }
+    } else {
+        config.extra = {};
+    }
+    
+    // For Microsoft, map some fields differently
+    if (providerType === 'microsoft') {
+        // Use microsoft_language instead of language
+        if (config.microsoft_language) {
+            config.language = config.microsoft_language;
         }
     }
-
+    
     return config;
 }
 
@@ -457,101 +549,119 @@ function toggleConfig(element) {
 
 function updateRequestUrl(config, provider) {
     const urlElement = provider.getElement('.requestUrl');
-    const baseUrl = provider.getElement('.baseUrl')?.value;
-    if (!baseUrl) return;
+    if (!urlElement) return;
+
+    const providerType = provider.getElement('.provider-select').value;
     
-    const params = new URLSearchParams();
-    
-    // Only add parameters that are explicitly set
-    const language = provider.getElement('.language')?.value;
-    if (language) params.append('language', language);
-    
-    const model = provider.getElement('.model')?.value;
-    if (model) params.append('model', model);
-    
-    const utteranceEndMs = provider.getElement('.utterance_end_ms')?.value;
-    if (utteranceEndMs) params.append('utterance_end_ms', utteranceEndMs);
-    
-    const endpointing = provider.getElement('.endpointing')?.value;
-    if (endpointing) params.append('endpointing', endpointing);
-    
-    const smartFormat = provider.getElement('.smart_format')?.checked;
-    if (smartFormat) params.append('smart_format', 'true');
-    
-    const interimResults = provider.getElement('.interim_results')?.checked;
-    if (interimResults) params.append('interim_results', 'true');
-    
-    const noDelay = provider.getElement('.no_delay')?.checked;
-    if (noDelay) params.append('no_delay', 'true');
-    
-    const dictation = provider.getElement('.dictation')?.checked;
-    if (dictation) params.append('dictation', 'true');
-    
-    const numerals = provider.getElement('.numerals')?.checked;
-    if (numerals) params.append('numerals', 'true');
-    
-    const profanityFilter = provider.getElement('.profanity_filter')?.checked;
-    if (profanityFilter) params.append('profanity_filter', 'true');
-    
-    const redact = provider.getElement('.redact')?.checked;
-    if (redact) params.append('redact', 'true');
-    
-    // Add extra parameters if any
-    const extraParams = provider.getElement('.extraParams');
-    if (extraParams?.value) {
-        try {
-            const extra = JSON.parse(extraParams.value);
-            Object.entries(extra).forEach(([key, value]) => {
-                if (value !== undefined && value !== '') {
-                    if (Array.isArray(value)) {
-                        value.forEach(v => params.append(key, v));
-                    } else {
-                        params.append(key, value);
-                    }
+    if (providerType === 'deepgram') {
+        // Build Deepgram URL
+        let baseUrl = config.base_url || 'api.deepgram.com';
+        let url = `wss://${baseUrl}/v1/listen?`;
+        
+        // Add model if specified
+        if (config.model) {
+            url += `model=${encodeURIComponent(config.model)}&`;
+        }
+        
+        // Add language if specified
+        if (config.language) {
+            url += `language=${encodeURIComponent(config.language)}&`;
+        }
+        
+        // Add boolean parameters
+        const boolParams = [
+            'smart_format',
+            'interim_results',
+            'no_delay',
+            'dictation',
+            'numerals',
+            'profanity_filter',
+            'redact'
+        ];
+        
+        boolParams.forEach(param => {
+            if (config[param] === true) {
+                url += `${param}=true&`;
+            }
+        });
+        
+        // Add numeric parameters
+        if (config.utterance_end_ms) {
+            url += `utterance_end_ms=${encodeURIComponent(config.utterance_end_ms)}&`;
+        }
+        
+        if (config.endpointing) {
+            url += `endpointing=${encodeURIComponent(config.endpointing)}&`;
+        }
+        
+        // Add extra parameters
+        if (config.extra && typeof config.extra === 'object') {
+            Object.entries(config.extra).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    url += `${encodeURIComponent(key)}=${encodeURIComponent(value)}&`;
                 }
             });
-        } catch (e) {
-            console.error('Invalid extra parameters JSON:', e);
         }
+        
+        // Remove trailing ampersand or question mark
+        if (url.endsWith('&')) {
+            url = url.slice(0, -1);
+        } else if (url.endsWith('?')) {
+            url = url.slice(0, -1);
+        }
+        
+        urlElement.textContent = url;
+    } else if (providerType === 'microsoft') {
+        // Build Microsoft URL representation (just for display)
+        let url = `Microsoft Speech SDK - ${config.microsoft_language || 'en-US'}`;
+        urlElement.textContent = url;
     }
-    
-    // Calculate maxLineLength for new parameters
-    const containerWidth = urlElement.parentElement.getBoundingClientRect().width;
-    const avgCharWidth = 8.5;
-    const safetyMargin = 40;
-    const maxLineLength = Math.floor((containerWidth - safetyMargin) / avgCharWidth);
-    
-    // Format URL with line breaks
-    const baseUrlDisplay = `ws://${baseUrl}/v1/listen?`;
-    const pairs = params.toString().split('&');
-    let currentLine = baseUrlDisplay;
-    const outputLines = [];
-    
-    pairs.forEach((pair, index) => {
-        const shouldBreakLine = currentLine !== baseUrlDisplay && 
-            (currentLine.length + pair.length + 1 > maxLineLength);
-        
-        if (shouldBreakLine) {
-            outputLines.push(currentLine + '&amp;');
-            currentLine = pair;
-        } else {
-            currentLine += (currentLine === baseUrlDisplay ? '' : '&amp;') + pair;
-        }
-        
-        if (index === pairs.length - 1) {
-            outputLines.push(currentLine);
-        }
-    });
-    
-    urlElement.innerHTML = outputLines.join('\n');
-    return outputLines.join('').replace(/&amp;/g, '&');
 }
 
 function toggleExtraParams(element) {
     const header = element.closest('.extra-params-header');
     const content = header.nextElementSibling;
-    header.classList.toggle('collapsed');
     content.classList.toggle('collapsed');
+    const chevron = header.querySelector('i');
+    if (chevron) {
+        chevron.style.transform = content.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(0deg)';
+    }
+}
+
+function updateConfigPanelForProvider(provider, providerType) {
+    // Get all config groups
+    const textInputs = provider.getElement('.text-inputs');
+    const booleanInputs = provider.getElement('.boolean-inputs');
+    
+    if (!textInputs || !booleanInputs) return;
+    
+    // Use the data-provider attributes to show/hide fields
+    const allLabels = provider.getAllElements('label[data-provider]');
+    
+    // First hide all provider-specific fields
+    allLabels.forEach(label => {
+        // Always show common fields
+        if (label.getAttribute('data-provider') === 'common') {
+            label.style.display = 'block';
+        } else {
+            label.style.display = 'none';
+        }
+    });
+    
+    // Then show fields specific to the selected provider
+    const providerLabels = provider.getAllElements(`label[data-provider="${providerType}"]`);
+    providerLabels.forEach(label => {
+        label.style.display = 'block';
+    });
+    
+    // Update URL display
+    const urlDisplay = provider.getElement('.url-display');
+    if (urlDisplay) {
+        urlDisplay.style.display = 'block';
+    }
+    
+    // Update the request URL display
+    updateRequestUrl(getConfig(provider), provider);
 }
 
 function addProvider() {
@@ -676,8 +786,11 @@ function parseUrlParams(url) {
     }
 }
 
-    // Fetch default configuration
-    fetch('../config/defaults.json')
+    // Fetch provider-specific configurations
+    const providerType = provider.getElement('.provider-select').value;
+    const configUrl = `../config/providers/${providerType}.json`;
+    
+    fetch(configUrl)
         .then(response => response.json())
         .then(config => {
             DEFAULT_CONFIG = config;
@@ -700,6 +813,7 @@ function initializeProvider(id) {
     const urlElement = provider.getElement('.requestUrl');
     const importButton = provider.getElement('.import-button');
     const importInput = provider.getElement('.importInput');
+    const providerSelect = provider.getElement('.provider-select');
 
     // Initialize record button
     if (recordButton) {
@@ -814,7 +928,7 @@ function initializeProvider(id) {
 
     // Initialize input change handlers
     ['input', 'change'].forEach(eventType => {
-        const inputs = provider.getAllElements('input, select, textarea');
+        const inputs = provider.getAllElements('input, textarea');
         inputs.forEach(input => {
             input.addEventListener(eventType, () => {
                 provider.changedParams.add(input.className);
@@ -822,6 +936,43 @@ function initializeProvider(id) {
             });
         });
     });
+    
+    // Add special handler for provider select to update the configuration panel
+    if (providerSelect) {
+        providerSelect.addEventListener('change', () => {
+            const selectedProviderType = providerSelect.value;
+            console.log(`Provider ${id} type changed to ${selectedProviderType}`);
+            
+            // Reset configuration when provider type changes
+            provider.changedParams.clear();
+            provider.isImported = false;
+            
+            // Fetch and apply provider-specific configuration
+            fetch(`../static/config/providers/${selectedProviderType}.json`)
+                .then(response => response.json())
+                .then(config => {
+                    // Apply the provider-specific configuration
+                    for (const [key, value] of Object.entries(config)) {
+                        if (typeof value === 'boolean') {
+                            const checkbox = provider.getElement(`.${key}`);
+                            if (checkbox) checkbox.checked = value;
+                        } else if (key !== 'extra') {
+                            const input = provider.getElement(`.${key}`);
+                            if (input) input.value = value;
+                        }
+                    }
+                    
+                    // Update the configuration panel UI
+                    updateConfigPanelForProvider(provider, selectedProviderType);
+                })
+                .catch(error => {
+                    console.error(`Error loading ${selectedProviderType} configuration:`, error);
+                });
+        });
+        
+        // Initialize the configuration panel based on the current provider type
+        updateConfigPanelForProvider(provider, providerSelect.value);
+    }
 
     // Initialize with default config
     Object.entries(DEFAULT_CONFIG).forEach(([key, value]) => {

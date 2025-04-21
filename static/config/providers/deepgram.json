@@ -4,7 +4,7 @@
     "language": "en",
     "utterance_end_ms": "1000",
     "endpointing": "10",
-    "smart_format": false,
+    "smart_format": true,
     "interim_results": true,
     "no_delay": false,
     "dictation": false,
@@ -12,4 +12,4 @@
     "profanity_filter": false,
     "redact": false,
     "extra": {}
-} 
+}

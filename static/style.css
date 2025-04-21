@@ -436,6 +436,11 @@ h1 {
   border-radius: 4px;
 }
 
+.provider-select option {
+  background-color: #333;
+  color: white;
+}
+
 .remove-provider-button {
   background: transparent;
   border: none;

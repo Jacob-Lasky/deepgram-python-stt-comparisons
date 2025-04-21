@@ -6,7 +6,7 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
 
-from providers import Providers, DeepgramProvider
+from providers import Providers, DeepgramProvider, MicrosoftProvider
 
 load_dotenv()
 
@@ -17,9 +17,31 @@ socketio = SocketIO(
     cors_allowed_origins="*"  # Allow all origins since we're in development
 )
 
-# Load default configuration
-with open("config/defaults.json", "r") as f:
-    DEFAULT_CONFIG = json.load(f)
+# Load provider-specific configurations
+DEFAULT_CONFIG = {}
+PROVIDER_CONFIGS = {}
+
+# Load provider configurations
+try:
+    # Load Deepgram config
+    with open("config/providers/deepgram.json", "r") as f:
+        PROVIDER_CONFIGS["deepgram"] = json.load(f)
+    
+    # Load Microsoft config
+    with open("config/providers/microsoft.json", "r") as f:
+        PROVIDER_CONFIGS["microsoft"] = json.load(f)
+    
+    # Use Deepgram as the default config for backward compatibility
+    DEFAULT_CONFIG = PROVIDER_CONFIGS["deepgram"]
+except Exception as e:
+    logging.error(f"Error loading provider configs: {e}")
+    # Fallback to defaults.json if provider configs fail to load
+    try:
+        with open("config/defaults.json", "r") as f:
+            DEFAULT_CONFIG = json.load(f)
+    except Exception as e:
+        logging.error(f"Error loading default config: {e}")
+        DEFAULT_CONFIG = {}
 
 # Initialize provider registry
 providers = Providers()
@@ -50,11 +72,14 @@ def index():
 
 # Provider connection handling
 def initialize_provider(provider_name: str, provider_id: int, config_options=None):
-    global active_providers
+    global active_providers, PROVIDER_CONFIGS
     
     # Stop the provider if it's already active
     if provider_id in active_providers:
         active_providers[provider_id].stop()
+        
+    # Get provider-specific default config
+    provider_default_config = PROVIDER_CONFIGS.get(provider_name, {})
     
     if provider_name == "deepgram":
         # get API key from .env file
@@ -66,9 +91,39 @@ def initialize_provider(provider_name: str, provider_id: int, config_options=Non
         # Create a callback specific to this provider ID
         callback = create_transcription_callback(provider_id)
         
+        # Merge provider default config with user-provided config
+        merged_config = provider_default_config.copy()
+        if config_options:
+            merged_config.update(config_options)
+        
         provider = DeepgramProvider(api_key, callback)
-        if not provider.initialize(config_options or {}):
+        if not provider.initialize(merged_config):
             logging.error(f"Failed to initialize Deepgram provider {provider_id}")
+            return False
+            
+        providers.add_provider(f"{provider_name}_{provider_id}", provider)
+        active_providers[provider_id] = provider
+        return True
+    
+    elif provider_name == "microsoft":
+        # get API key and region from .env file
+        api_key = os.getenv("AZURE_SPEECH_KEY")
+        region = os.getenv("AZURE_SPEECH_REGION")
+        if not api_key or not region:
+            logging.error("No Microsoft Speech API key or region found in environment")
+            return False
+        
+        # Create a callback specific to this provider ID
+        callback = create_transcription_callback(provider_id)
+        
+        # Merge provider default config with user-provided config
+        merged_config = provider_default_config.copy()
+        if config_options:
+            merged_config.update(config_options)
+        
+        provider = MicrosoftProvider(api_key, region, callback)
+        if not provider.initialize(merged_config):
+            logging.error(f"Failed to initialize Microsoft provider {provider_id}")
             return False
             
         providers.add_provider(f"{provider_name}_{provider_id}", provider)
