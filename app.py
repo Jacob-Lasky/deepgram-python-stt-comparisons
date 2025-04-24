@@ -29,7 +29,6 @@ socketio = SocketIO(
 )
 
 # Load provider-specific configurations
-DEFAULT_CONFIG = {}
 PROVIDER_CONFIGS = {}
 
 # Load provider configurations
@@ -43,21 +42,8 @@ try:
     with open("static/config/providers/microsoft.json", "r") as f:
         PROVIDER_CONFIGS["microsoft"] = json.load(f)
         logging.info("Successfully loaded Microsoft provider config")
-    
-    # Use Deepgram as the default config for backward compatibility
-    DEFAULT_CONFIG = PROVIDER_CONFIGS["deepgram"]
-    logging.info("Using Deepgram as default config")
 except Exception as e:
     logging.error(f"Error loading provider configs: {e}")
-    # Fallback to defaults.json if provider configs fail to load
-    try:
-        with open("static/config/defaults.json", "r") as f:
-            DEFAULT_CONFIG = json.load(f)
-            logging.info("Using defaults.json as fallback")
-    except Exception as e:
-        logging.error(f"Error loading default config: {e}")
-        DEFAULT_CONFIG = {}
-        logging.info("Using empty default config as fallback")
 
 # Initialize provider registry
 providers = Providers()

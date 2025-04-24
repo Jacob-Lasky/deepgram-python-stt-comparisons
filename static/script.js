@@ -21,20 +21,12 @@ async function loadProviderConfigs() {
             PROVIDER_CONFIGS.microsoft = await microsoftResponse.json();
         }
         
-        // Use Deepgram as default for backward compatibility
-        if (PROVIDER_CONFIGS.deepgram) {
-            DEFAULT_CONFIG = PROVIDER_CONFIGS.deepgram;
-        }
-        
         console.log('Loaded provider configurations:', PROVIDER_CONFIGS);
     } catch (error) {
         console.error('Error loading provider configurations:', error);
         // Fallback default configuration
         DEFAULT_CONFIG = {
             "language": "en",
-            "interim_results": true,
-            "base_url": "api.deepgram.com",
-            "model": "nova-3",
             "extra": {}
         };
     }
@@ -526,10 +518,16 @@ function getConfig(provider) {
     const config = {};
     const providerType = provider.getElement('.provider-select')?.value;
     
+    // Only collect inputs that are visible or common to all providers
     // Get text inputs
     const textInputs = provider.getAllElements('.text-inputs input[type="text"]');
     textInputs.forEach(input => {
-        if (input.value) {
+        // Check if the input's parent label is visible or has no data-provider attribute (common field)
+        const parentLabel = input.closest('label');
+        const isCommonField = !parentLabel.hasAttribute('data-provider');
+        const isProviderSpecific = parentLabel.getAttribute('data-provider') === providerType;
+        
+        if ((isCommonField || isProviderSpecific) && input.value) {
             config[input.className] = input.value;
         }
     });
@@ -537,7 +535,14 @@ function getConfig(provider) {
     // Get boolean inputs
     const booleanInputs = provider.getAllElements('.boolean-inputs input[type="checkbox"]');
     booleanInputs.forEach(input => {
-        config[input.className] = input.checked;
+        // Check if the input's parent label is visible or has no data-provider attribute (common field)
+        const parentLabel = input.closest('label');
+        const isCommonField = !parentLabel.hasAttribute('data-provider');
+        const isProviderSpecific = parentLabel.getAttribute('data-provider') === providerType;
+        
+        if (isCommonField || isProviderSpecific) {
+            config[input.className] = input.checked;
+        }
     });
     
     // Get extra parameters
@@ -563,6 +568,7 @@ function getConfig(provider) {
         }
     }
     
+    console.log(`Generated config for ${providerType}:`, config);
     return config;
 }
 
