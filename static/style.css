@@ -541,26 +541,6 @@ h1 {
   height: 16px;
 }
 
-.import-section {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.import-section input {
-  flex: 1;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  color: #fff;
-  font-family: monospace;
-}
-
-.import-section input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
 .import-button {
   padding: 8px 16px;
   background: #47aca9;

@@ -24,11 +24,6 @@ async function loadProviderConfigs() {
         console.log('Loaded provider configurations:', PROVIDER_CONFIGS);
     } catch (error) {
         console.error('Error loading provider configurations:', error);
-        // Fallback default configuration
-        DEFAULT_CONFIG = {
-            "language": "en",
-            "extra": {}
-        };
     }
 }
 
@@ -331,78 +326,6 @@ function resetConfig(provider) {
             updateRequestUrl(getConfig(provider), provider);
         });
 }
-
-function importConfig(input, provider) {
-    if (!DEFAULT_CONFIG) return;
-    
-    // Reset all options to defaults first
-    setDefaultValues(provider);
-    
-    let config;
-    
-    try {
-        config = JSON.parse(input);
-    } catch (e) {
-        config = parseUrlParams(input);
-    }
-    
-    if (!config) {
-        throw new Error('Invalid configuration format. Please provide a valid JSON object or URL.');
-    }
-
-    // Set import state
-    provider.isImported = true;
-
-    // Clear all form fields first
-    ['baseUrl', 'model', 'language', 'utterance_end_ms', 'endpointing'].forEach(className => {
-        const element = provider.getElement(`.${className}`);
-        if (element) {
-            element.value = '';
-        }
-    });
-
-    ['smart_format', 'interim_results', 'no_delay', 'dictation', 
-     'numerals', 'profanity_filter', 'redact'].forEach(className => {
-        const element = provider.getElement(`.${className}`);
-        if (element) {
-            element.checked = false;
-        }
-    });
-
-    // Only set values that are explicitly in the config
-    Object.entries(config).forEach(([key, value]) => {
-        const element = provider.getElement(`.${key}`);
-        if (element) {
-            if (element.type === 'checkbox') {
-                element.checked = value === 'true' || value === true;
-            } else {
-                element.value = value;
-            }
-            provider.changedParams.add(key);
-        } else {
-            // If the key doesn't correspond to a form element, it's an extra param
-            const extraParams = provider.getElement('.extraParams');
-            if (extraParams) {
-                const currentExtra = JSON.parse(extraParams.value || '{}');
-                currentExtra[key] = value;
-                extraParams.value = JSON.stringify(currentExtra, null, 2);
-                provider.changedParams.add('extraParams');
-            }
-        }
-    });
-
-    // Set baseUrl if not in config
-    if (!config.baseUrl) {
-        const baseUrlElement = provider.getElement('.baseUrl');
-        if (baseUrlElement) {
-            baseUrlElement.value = 'api.deepgram.com';
-        }
-    }
-
-    // Update the URL display
-    updateRequestUrl(getConfig(provider), provider);
-}
-
 
 
 async function getMicrophone() {
@@ -920,68 +843,6 @@ function initializeProvider(id) {
                     finalCaptions.innerHTML = '';
                 }
             });
-        });
-    }
-
-    // Initialize import functionality
-    if (importButton && importInput) {
-        importButton.addEventListener('click', () => {
-            const input = importInput.value.trim();
-            if (!input) {
-                alert('Please enter a configuration to import.');
-                return;
-            }
-            
-            try {
-                importConfig(input, provider);
-                importInput.value = '';
-            } catch (e) {
-                alert('Invalid configuration format. Please provide a valid JSON object or URL.');
-            }
-        });
-
-        importInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                importButton.click();
-            }
-        });
-    }
-
-    // Initialize URL editing
-    if (urlElement) {
-        urlElement.addEventListener('input', function(e) {
-            const selection = window.getSelection();
-            const range = selection.getRangeAt(0);
-            const cursorOffset = range.startOffset;
-            
-            const url = this.textContent.replace(/\s+/g, '').replace(/&amp;/g, '&');
-            const config = parseUrlParams(url);
-            if (config) {
-                Object.entries(config).forEach(([key, value]) => {
-                    const element = provider.getElement(`.${key}`);
-                    if (element) {
-                        if (element.type === 'checkbox') {
-                            element.checked = value === 'true' || value === true;
-                        } else {
-                            element.value = value;
-                        }
-                        provider.changedParams.add(key);
-                    }
-                });
-                
-                updateRequestUrl(getConfig(provider), provider);
-                
-                try {
-                    const newRange = document.createRange();
-                    newRange.setStart(urlElement.firstChild || urlElement, Math.min(cursorOffset, (urlElement.firstChild || urlElement).length));
-                    newRange.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(newRange);
-                } catch (e) {
-                    console.warn('Could not restore cursor position:', e);
-                }
-            }
         });
     }
 
