@@ -221,7 +221,7 @@ def handle_toggle_transcription(data):
     logging.info(f"TOGGLE: Current active_providers before processing: {list(active_providers.keys())}")
     
     action = data.get("action")
-    provider_name = data.get("provider", "deepgram")
+    provider_name = data.get("provider", None)
     provider_id = data.get("providerId", 0)
     
     logging.info(f"PROVIDER SELECTION: Action={action}, Provider={provider_name}, ID={provider_id}")
@@ -356,14 +356,6 @@ if __name__ == "__main__":
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(ColoredFormatter())
     root_logger.addHandler(stream_handler)
-
-    # Suppress Deepgram websocket logs
-    deepgram_loggers = [
-        'deepgram.clients.listen_router',
-        'deepgram.clients.common.v1.abstract_sync_websocket'
-    ]
-    for logger_name in deepgram_loggers:
-        logging.getLogger(logger_name).setLevel(logging.ERROR)
 
     logging.info("Starting combined Flask-SocketIO server")
     socketio.run(app, debug=True, allow_unsafe_werkzeug=True, port=8001)

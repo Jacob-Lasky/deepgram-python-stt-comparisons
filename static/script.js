@@ -526,53 +526,6 @@ function removeProvider(id) {
         providers.splice(index, 1);
     }
 }
-
-function parseUrlParams(url) {
-    try {
-        // Handle ws:// and wss:// protocols by temporarily replacing them
-        let modifiedUrl = url;
-        if (url.startsWith('ws://') || url.startsWith('wss://')) {
-            modifiedUrl = url.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://');
-        }
-        
-        // If URL starts with a path, prepend the default base URL
-        if (url.startsWith('/')) {
-            modifiedUrl = 'http://api.deepgram.com' + url;
-        }
-        
-        const urlObj = new URL(modifiedUrl);
-        const params = {};
-
-        // Extract the hostname as baseUrl, removing /v1/listen if present
-        params.baseUrl = urlObj.hostname;
-        
-        // Handle duplicate parameters as arrays
-        const paramMap = new Map();
-        urlObj.searchParams.forEach((value, key) => {
-            const cleanKey = key.trim();
-            const cleanValue = value.trim();
-            if (cleanKey && cleanValue) {
-                if (paramMap.has(cleanKey)) {
-                    const existingValue = paramMap.get(cleanKey);
-                    paramMap.set(cleanKey, Array.isArray(existingValue) ? [...existingValue, cleanValue] : [existingValue, cleanValue]);
-                } else {
-                    paramMap.set(cleanKey, cleanValue);
-                }
-            }
-        });
-        
-        // Convert Map to object
-        paramMap.forEach((value, key) => {
-            params[key] = value;
-        });
-        
-        return params;
-    } catch (e) {
-        console.error('Invalid URL:', e);
-        return null;
-    }
-}
-
     // Fetch provider-specific configurations
     const providerType = provider.getElement('.provider-select').value;
     const configUrl = `../config/providers/${providerType}.json`;
