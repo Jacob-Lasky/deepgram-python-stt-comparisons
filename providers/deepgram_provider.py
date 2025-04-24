@@ -52,8 +52,10 @@ class DeepgramProvider(BaseSTTProvider):
         if not self.connection:
             logging.error("DG: Deepgram connection not initialized")
             return False
-            
-        live_options = LiveOptions(**options)
+        blacklisted_keys = ["price_per_hour", "provider"]
+        filtered_options = {k: v for k, v in options.items() if k not in blacklisted_keys}
+
+        live_options = LiveOptions(**filtered_options)
         return self.connection.start(live_options)
 
     def send(self, audio_data: bytes) -> None:

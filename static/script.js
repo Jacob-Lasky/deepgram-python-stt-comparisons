@@ -233,6 +233,13 @@ function setDefaultValues(provider) {
                     if (input) input.value = value;
                 }
             }
+            
+            // Set the price_per_hour input value with proper decimal formatting
+            const priceInput = provider.getElement('.price_per_hour');
+            if (priceInput && config.price_per_hour !== undefined) {
+                // Format the price to always show 3 decimal places
+                priceInput.value = parseFloat(config.price_per_hour).toFixed(3);
+            }
         })
 }
 
@@ -257,6 +264,13 @@ function resetConfig(provider) {
                     const input = provider.getElement(`.${key}`);
                     if (input) input.value = value;
                 }
+            }
+            
+            // Set the price_per_hour input value with proper decimal formatting
+            const priceInput = provider.getElement('.price_per_hour');
+            if (priceInput && config.price_per_hour !== undefined) {
+                // Format the price to always show 3 decimal places
+                priceInput.value = parseFloat(config.price_per_hour).toFixed(3);
             }
         })
         .catch(error => {
@@ -301,7 +315,22 @@ async function openMicrophone(microphone, socket, provider) {
 function startCostTicker(provider) {
   // Get the provider type and price per hour
   const providerType = provider.getElement('.provider-select').value;
-  provider.pricePerHour = PROVIDER_CONFIGS[providerType]?.price_per_hour || 0;
+  
+  // Get the custom price_per_hour from the input field, or fall back to the config value
+  const priceInput = provider.getElement('.price_per_hour');
+  
+  // Get the price value and format it consistently
+  let priceValue;
+  if (priceInput && priceInput.value) {
+    // Use the value from the input field
+    provider.pricePerHour = parseFloat(priceInput.value);
+    priceValue = provider.pricePerHour.toFixed(3);
+  } else {
+    // Use the value from the config
+    const configPrice = PROVIDER_CONFIGS[providerType]?.price_per_hour || 0;
+    provider.pricePerHour = parseFloat(configPrice);
+    priceValue = provider.pricePerHour.toFixed(3);
+  }
   
   // Get the cost ticker elements
   const costTicker = provider.getElement('.cost-ticker');
@@ -313,9 +342,9 @@ function startCostTicker(provider) {
   // Show the cost ticker
   costTicker.style.display = 'flex';
   
-  // Set the price per hour info
+  // Set the price per hour info with proper formatting
   if (costPerHour) {
-    costPerHour.textContent = `($${provider.pricePerHour.toFixed(3)}/hr)`;
+    costPerHour.textContent = `($${priceValue}/hr)`;
   }
   
   // Set the starting time
@@ -655,8 +684,7 @@ function initializeProvider(id) {
             });
         });
     });
-    
-    // Add special handler for provider select to update the configuration panel
+        // Add special handler for provider select to update the configuration panel
     if (providerSelect) {
         providerSelect.addEventListener('change', () => {
             const selectedProviderType = providerSelect.value;
@@ -679,6 +707,13 @@ function initializeProvider(id) {
                             const input = provider.getElement(`.${key}`);
                             if (input) input.value = value;
                         }
+                    }
+                    
+                    // Update the price_per_hour input value with proper decimal formatting
+                    const priceInput = provider.getElement('.price_per_hour');
+                    if (priceInput && config.price_per_hour !== undefined) {
+                        // Format the price to always show 3 decimal places
+                        priceInput.value = parseFloat(config.price_per_hour).toFixed(3);
                     }
                     
                     // Update the configuration panel UI
