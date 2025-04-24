@@ -230,14 +230,6 @@ function setDefaultValues(provider) {
                     if (input) input.value = value;
                 }
             }
-            
-            // Update extra params if present
-            if (config.extra && Object.keys(config.extra).length > 0) {
-                const extraParams = provider.getElement('.extraParams');
-                if (extraParams) {
-                    extraParams.value = JSON.stringify(config.extra, null, 2);
-                }
-            }
         })
 }
 
@@ -261,14 +253,6 @@ function resetConfig(provider) {
                 } else if (key !== 'extra') {
                     const input = provider.getElement(`.${key}`);
                     if (input) input.value = value;
-                }
-            }
-            
-            // Update extra params if present
-            if (config.extra && Object.keys(config.extra).length > 0) {
-                const extraParams = provider.getElement('.extraParams');
-                if (extraParams) {
-                    extraParams.value = JSON.stringify(config.extra, null, 2);
                 }
             }
         })
@@ -416,21 +400,6 @@ function getConfig(provider) {
         }
     });
     
-    // Get extra parameters
-    const extraParamsInput = provider.getElement('.extraParams');
-    if (extraParamsInput && extraParamsInput.value) {
-        try {
-            const extraParams = JSON.parse(extraParamsInput.value);
-            config.extra = extraParams;
-        } catch (e) {
-            console.error('Invalid JSON in extra parameters:', e);
-            // Use empty object as fallback
-            config.extra = {};
-        }
-    } else {
-        config.extra = {};
-    }
-    
     console.log(`Generated config for ${providerType}:`, config);
     return config;
 }
@@ -453,16 +422,6 @@ function toggleConfig(element) {
             if (chevron) chevron.style.transform = 'rotate(0deg)';
         }
     });
-}
-
-function toggleExtraParams(element) {
-    const header = element.closest('.extra-params-header');
-    const content = header.nextElementSibling;
-    content.classList.toggle('collapsed');
-    const chevron = header.querySelector('i');
-    if (chevron) {
-        chevron.style.transform = content.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(0deg)';
-    }
 }
 
 function updateConfigPanelForProvider(provider, providerType) {
@@ -742,36 +701,3 @@ function initializeProvider(id) {
             });
         }
     });
-    
-    // Add event listener for extra params
-    const extraParams = provider.getElement('.extraParams');
-    if (extraParams) {
-        extraParams.addEventListener('blur', () => {
-            try {
-                const rawJson = extraParams.value || '{}';
-                // Parse the raw JSON string to handle duplicate keys
-                const processedExtra = {};
-                try {
-                    const parsed = JSON.parse(rawJson);
-                    Object.entries(parsed).forEach(([key, value]) => {
-                        processedExtra[key] = value;
-                    });
-                } catch (e) {
-                    console.warn('Invalid JSON in extra params');
-                    return;
-                }
-                
-                // Update the textarea with properly formatted JSON
-                extraParams.value = JSON.stringify(processedExtra, null, 2);
-                
-                // Only mark as changed if there are actual extra params
-                if (Object.keys(processedExtra).length > 0) {
-                    provider.changedParams.add('extraParams');
-                } else {
-                    provider.changedParams.delete('extraParams');
-                }
-            } catch (e) {
-                console.warn('Invalid JSON in extra params');
-            }
-        });
-    }

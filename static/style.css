@@ -261,42 +261,6 @@ h1 {
   transform: rotate(0deg);
 }
 
-.extraParams {
-  width: calc(100% - 16px);
-  min-height: 60px;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  color: #fff;
-  font-family: monospace;
-  font-size: 14px;
-  display: block;
-  margin-top: 4px;
-  height: 80px;
-  resize: vertical;
-}
-
-#extraParams::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-/* .url-display {
-  width: 100%;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  font-family: monospace;
-  color: #47aca9;
-  font-size: 14px;
-  white-space: pre-line;
-  word-break: keep-all;
-  box-sizing: border-box;
-  position: relative;
-  max-height: 30vh;
-  overflow-y: auto;
-} */
-
 .url-buttons {
   position: absolute;
   bottom: 8px;
