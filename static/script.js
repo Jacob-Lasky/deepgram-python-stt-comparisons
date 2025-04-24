@@ -729,58 +729,6 @@ function initializeProvider(id) {
         updateConfigPanelForProvider(provider, providerSelect.value);
     }
 }
-
-    // Make URL editable
-    const urlElement = provider.getElement('.requestUrl');
-    if (urlElement) {
-        urlElement.contentEditable = true;
-        urlElement.style.cursor = 'text';
-        
-        // Add event listener for URL editing
-        urlElement.addEventListener('input', function(e) {
-            // Store cursor position
-            const selection = window.getSelection();
-            const range = selection.getRangeAt(0);
-            const cursorOffset = range.startOffset;
-            
-            const url = this.textContent.replace(/\s+/g, '').replace(/&amp;/g, '&');
-            const config = parseUrlParams(url);
-            if (config) {
-                // Update form fields based on URL
-                Object.entries(config).forEach(([key, value]) => {
-                    const element = provider.getElement(`.${key}`);
-                    if (element) {
-                        if (element.type === 'checkbox') {
-                            element.checked = value === 'true' || value === true;
-                        } else {
-                            element.value = value;
-                        }
-                        provider.changedParams.add(key);
-                    }
-                });
-                
-                // Update extra parameters
-                const extraParams = {};
-                Object.entries(config).forEach(([key, value]) => {
-                    if (!provider.getElement(`.${key}`)) {
-                        extraParams[key] = value;
-                    }
-                });
-                provider.getElement('.extraParams').value = JSON.stringify(extraParams, null, 2);
-                
-                // Restore cursor position
-                try {
-                    const newRange = document.createRange();
-                    newRange.setStart(urlElement.firstChild || urlElement, Math.min(cursorOffset, (urlElement.firstChild || urlElement).length));
-                    newRange.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(newRange);
-                } catch (e) {
-                    console.warn('Could not restore cursor position:', e);
-                }
-            }
-        });
-    }
     
     // Add event listeners to all config inputs with change tracking
     const configInputs = provider.getAllElements('.config-panel input');
