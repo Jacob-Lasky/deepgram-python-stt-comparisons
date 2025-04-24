@@ -4,7 +4,6 @@ const socket_port = 8001;
 
 // Provider configurations
 let PROVIDER_CONFIGS = {};
-let DEFAULT_CONFIG = {};
 
 // Load provider configurations
 async function loadProviderConfigs() {
@@ -127,18 +126,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.error('Could not find add provider button');
     }
 
-    // Initialize default configuration
-    try {
-        const response = await fetch('../config/defaults.json');
-        if (response.ok) {
-            const config = await response.json();
-            Object.assign(DEFAULT_CONFIG, config);
-        }
-    } catch (error) {
-        console.warn('Could not load default configuration, using built-in defaults:', error);
-    }
-    console.log('Using configuration:', DEFAULT_CONFIG);
-
     // Add main record button handler
     const mainRecordButton = document.getElementById('record');
     
@@ -255,34 +242,6 @@ function setDefaultValues(provider) {
             // Update the URL display
             updateRequestUrl(getConfig(provider), provider);
         })
-        .catch(error => {
-            console.error(`Error loading ${providerType} configuration:`, error);
-            // Fallback to default values if available
-            if (DEFAULT_CONFIG) {
-                // Set text input defaults
-                ['baseUrl', 'model', 'language', 'utterance_end_ms', 'endpointing', 'microsoft_language'].forEach(className => {
-                    const element = provider.getElement(`.${className}`);
-                    if (element && DEFAULT_CONFIG[className]) {
-                        element.value = DEFAULT_CONFIG[className];
-                    }
-                });
-
-                // Set checkbox defaults
-                ['smart_format', 'interim_results', 'no_delay', 'dictation', 
-                 'numerals', 'profanity_filter', 'redact'].forEach(className => {
-                    const element = provider.getElement(`.${className}`);
-                    if (element && DEFAULT_CONFIG[className] !== undefined) {
-                        element.checked = DEFAULT_CONFIG[className];
-                    }
-                });
-
-                // Set extra params default
-                const extraParams = provider.getElement('.extraParams');
-                if (extraParams) {
-                    extraParams.value = JSON.stringify(DEFAULT_CONFIG.extra || {}, null, 2);
-                }
-            }
-        });
 }
 
 function resetConfig(provider) {
@@ -760,16 +719,7 @@ function parseUrlParams(url) {
     
     fetch(configUrl)
         .then(response => response.json())
-        .then(config => {
-            DEFAULT_CONFIG = config;
-            // Initialize URL with current config
-            updateRequestUrl(getConfig());
-        })
-        .catch(error => {
-            console.error('Error loading default configuration:', error);
-            // Initialize URL with current config
-            updateRequestUrl(getConfig());
-        });
+        .then(updateRequestUrl(getConfig()));
 
 function initializeProvider(id) {
     const provider = providers.find(p => p.id === id);
@@ -778,9 +728,6 @@ function initializeProvider(id) {
     const recordButton = provider.getElement('.mic-checkbox');
     const resetButton = provider.getElement('.reset-button');
     const clearButton = provider.getElement('.clear-button');
-    const urlElement = provider.getElement('.requestUrl');
-    const importButton = provider.getElement('.import-button');
-    const importInput = provider.getElement('.importInput');
     const providerSelect = provider.getElement('.provider-select');
     
     // Add event listener for provider type change
@@ -816,20 +763,10 @@ function initializeProvider(id) {
     // Initialize reset button
     if (resetButton) {
         resetButton.addEventListener('click', () => {
-            if (!DEFAULT_CONFIG) return;
+            resetConfig(provider);
             provider.changedParams.clear();
             provider.isImported = false;
-            Object.entries(DEFAULT_CONFIG).forEach(([key, value]) => {
-                const element = provider.getElement(`.${key}`);
-                if (element) {
-                    if (element.type === 'checkbox') {
-                        element.checked = value === 'true' || value === true;
-                    } else {
-                        element.value = value;
-                    }
-                }
-            });
-            updateRequestUrl(DEFAULT_CONFIG, provider);
+            updateRequestUrl(getConfig(), provider);
         });
     }
 
@@ -894,20 +831,10 @@ function initializeProvider(id) {
         updateConfigPanelForProvider(provider, providerSelect.value);
     }
 
-    // Initialize with default config
-    Object.entries(DEFAULT_CONFIG).forEach(([key, value]) => {
-        const element = provider.getElement(`.${key}`);
-        if (element) {
-            if (element.type === 'checkbox') {
-                element.checked = value === 'true' || value === true;
-            } else {
-                element.value = value;
-            }
-        }
-    });
-    updateRequestUrl(DEFAULT_CONFIG, provider);
+    // Initialize with provider config
+    updateRequestUrl(getConfig(), provider);
 }
-    
+
     // Make URL editable
     const urlElement = provider.getElement('.requestUrl');
     if (urlElement) {
