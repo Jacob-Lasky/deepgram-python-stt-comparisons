@@ -183,6 +183,9 @@ class Provider {
     this.changedParams = new Set();
     this.isImported = false;
     this.column = null;
+    this.recordingStartTime = null;
+    this.costInterval = null;
+    this.pricePerHour = 0;
   }
 
   getElement(selector) {
@@ -295,6 +298,49 @@ async function openMicrophone(microphone, socket, provider) {
   });
 }
 
+function startCostTicker(provider) {
+  // Get the provider type and price per hour
+  const providerType = provider.getElement('.provider-select').value;
+  provider.pricePerHour = PROVIDER_CONFIGS[providerType]?.price_per_hour || 0;
+  
+  // Get the cost ticker elements
+  const costTicker = provider.getElement('.cost-ticker');
+  const costValue = provider.getElement('.cost-value');
+  const costPerHour = provider.getElement('.cost-per-hour');
+  
+  if (!costTicker || !costValue) return;
+  
+  // Show the cost ticker
+  costTicker.style.display = 'flex';
+  
+  // Set the price per hour info
+  if (costPerHour) {
+    costPerHour.textContent = `($${provider.pricePerHour.toFixed(3)}/hr)`;
+  }
+  
+  // Set the starting time
+  provider.recordingStartTime = Date.now();
+  
+  // Update the cost every second
+  provider.costInterval = setInterval(() => {
+    if (!provider.recordingStartTime) return;
+    
+    const elapsedTimeHours = (Date.now() - provider.recordingStartTime) / 3600000; // Convert ms to hours
+    const cost = elapsedTimeHours * provider.pricePerHour;
+    
+    costValue.textContent = cost.toFixed(4);
+  }, 1000);
+}
+
+function stopCostTicker(provider) {
+  if (provider.costInterval) {
+    clearInterval(provider.costInterval);
+    provider.costInterval = null;
+  }
+  
+  provider.recordingStartTime = null;
+}
+
 async function startRecording(provider) {
   provider.isRecording = true;
   provider.microphone = await getMicrophone();
@@ -317,6 +363,9 @@ async function startRecording(provider) {
   // Get the provider type from the dropdown
   const providerType = provider.getElement('.provider-select').value;
   console.log(`Starting recording with provider type: ${providerType}`);
+  
+  // Start the cost ticker
+  startCostTicker(provider);
   
   // Create the data object to send
   const data = { 
@@ -345,6 +394,9 @@ async function stopRecording(provider) {
   if (provider.isRecording === true) {
     provider.microphone.stop();
     provider.microphone.stream.getTracks().forEach((track) => track.stop()); // Stop all tracks
+    
+    // Stop the cost ticker
+    stopCostTicker(provider);
     
     // Get the provider type from the dropdown
     const providerType = provider.getElement('.provider-select').value;

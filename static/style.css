@@ -338,6 +338,31 @@ h1 {
   max-width: 500px;
   flex: 1;
   width: 100%;
+  position: relative;
+}
+
+.cost-ticker {
+  background: rgba(71, 172, 169, 0.2);
+  color: #13ef95;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  font-family: monospace;
+  font-size: 16px;
+  border-left: 3px solid #47aca9;
+}
+
+.cost-value {
+  margin: 0 4px;
+}
+
+.cost-per-hour {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-left: auto;
 }
 
 /* Single column */
@@ -436,19 +461,6 @@ h1 {
   max-width: 800px;
   margin: 0 auto;
   overflow-y: auto;
-}
-
-.highlight-change {
-  animation: highlight 1s ease-in-out;
-}
-
-@keyframes highlight {
-  0% {
-    background-color: rgba(255, 255, 0, 0.4);
-  }
-  100% {
-    background-color: transparent;
-  }
 }
 
 .config-columns {

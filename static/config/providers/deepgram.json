@@ -9,5 +9,6 @@
     "dictation": false,
     "numerals": false,
     "profanity_filter": false,
-    "redact": false
+    "redact": false,
+    "price_per_hour": 0.258
 }
