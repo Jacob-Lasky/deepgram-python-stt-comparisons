@@ -23,7 +23,7 @@ class DeepgramProvider(BaseSTTProvider):
         self.client = None
         self.connection = None
         self._config = DeepgramClientOptions(
-            verbose=logging.INFO,
+            verbose=logging.WARNING,
             options={"keepalive": "true"},
         )
 
@@ -77,6 +77,7 @@ class DeepgramProvider(BaseSTTProvider):
 
     def send(self, audio_data: bytes) -> None:
         """Send audio data to Deepgram."""
+        logging.debug(f"DG: Send method called, connection status: is_connected={self.is_connected}")
         if self.connection and self.is_connected:
             self.connection.send(audio_data)
 
@@ -95,6 +96,7 @@ class DeepgramProvider(BaseSTTProvider):
     @property
     def is_connected(self) -> bool:
         """Check if Deepgram is currently connected."""
+        logging.debug(f"DG: Checking connection status: is_connected={self.connection is not None}")
         return self.connection is not None
 
     def _on_open(self, client, open_event, **kwargs):
@@ -103,8 +105,15 @@ class DeepgramProvider(BaseSTTProvider):
 
     def _on_message(self, client, result, **kwargs):
         """Handle transcription message event."""
+        logging.debug(f"DG: Received transcription message: {result}")
         transcript = result.channel.alternatives[0].transcript
         if len(transcript) > 0:
+            if result.is_final:
+                logging.info(f"DG: Recieved finalized transcript")
+            else:
+                logging.info(f"DG: Received interim transcript")
+
+            logging.debug(f"DG: Sending transcription to callback: {transcript}")
             timing = {"start": result.start, "end": result.start + result.duration}
             self.on_transcription({
                 "transcription": transcript,

@@ -437,8 +437,8 @@ h1 {
 }
 
 .provider-select option {
-  background-color: #333;
-  color: white;
+  background-color: white;
+  color: #333;
 }
 
 .remove-provider-button {

@@ -164,7 +164,7 @@ class MicrosoftProvider(BaseSTTProvider):
 
     def send(self, audio_data: bytes) -> None:
         """Send audio data to Microsoft Speech."""
-        logging.info(f"MSFT: Send method called, connection status: is_connected={self.is_connected}")
+        logging.debug(f"MSFT: Send method called, connection status: is_connected={self.is_connected}")
         
         if not self._is_connected:
             logging.error("MSFT: Cannot send audio - not connected")
@@ -176,12 +176,12 @@ class MicrosoftProvider(BaseSTTProvider):
             
         try:
             # Log audio data size
-            logging.info(f"MSFT: Sending {len(audio_data)} bytes of audio data")
+            logging.debug(f"MSFT: Sending {len(audio_data)} bytes of audio data")
             
             # Send the WebM audio data directly to the stream
             # The AudioStreamFormat with ANY format should handle WebM correctly
             self._audio_stream.write(audio_data)
-            logging.info("MSFT: Successfully wrote audio data to stream")
+            logging.debug("MSFT: Successfully wrote audio data to stream")
         except Exception as e:
             logging.error(f"MSFT: Error sending audio data to Microsoft Speech: {e}")
             logging.error(f"MSFT: Exception details: {traceback.format_exc()}")
@@ -219,14 +219,14 @@ class MicrosoftProvider(BaseSTTProvider):
     @property
     def is_connected(self) -> bool:
         """Check if Microsoft Speech is currently connected."""
-        logging.info(f"MSFT: Checking connection status: _is_connected={self._is_connected}")
+        logging.debug(f"MSFT: Checking connection status: _is_connected={self._is_connected}")
         return self._is_connected
 
     def _on_recognizing(self, evt):
         """Handle interim recognition results."""
         logging.info(f"MSFT: Received interim recognition event")
         if evt.result.text:
-            logging.info(f"MSFT: Interim transcription: {evt.result.text}")
+            logging.debug(f"MSFT: Interim transcription: {evt.result.text}")
             # Send the transcription through the callback
             self.on_transcription({
                 "transcription": evt.result.text,
@@ -240,7 +240,7 @@ class MicrosoftProvider(BaseSTTProvider):
         """Handle final recognition results."""
         logging.info(f"MSFT: Received final recognition event")
         if evt.result.text:
-            logging.info(f"MSFT: Final transcription: {evt.result.text}")
+            logging.debug(f"MSFT: Final transcription: {evt.result.text}")
             # Send the final transcription through the callback
             self.on_transcription({
                 "transcription": evt.result.text,

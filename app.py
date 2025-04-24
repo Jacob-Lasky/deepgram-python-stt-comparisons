@@ -65,11 +65,11 @@ active_providers = {}  # Dictionary to store active providers by ID
 
 # Function to debug active_providers
 def debug_active_providers():
-    logging.info(f"DEBUG: active_providers contains {len(active_providers)} items")
+    logging.debug(f"DEBUG: active_providers contains {len(active_providers)} items")
     for pid, provider in active_providers.items():
         provider_type = type(provider).__name__
         is_connected = provider.is_connected if hasattr(provider, 'is_connected') else 'unknown'
-        logging.info(f"DEBUG: Provider {pid} is of type {provider_type}, connected: {is_connected}")
+        logging.debug(f"DEBUG: Provider {pid} is of type {provider_type}, connected: {is_connected}")
 
 def create_transcription_callback(provider_id):
     """Create a callback function for a specific provider ID."""
@@ -78,12 +78,12 @@ def create_transcription_callback(provider_id):
         result["providerId"] = provider_id
         
         # Log the full result being sent to the client
-        logging.info(f"Emitting transcription from provider {provider_id}: {result}")
+        logging.debug(f"Emitting transcription from provider {provider_id}: {result}")
         
         # Ensure is_final is a boolean
         if "is_final" in result:
             result["is_final"] = bool(result["is_final"])
-            logging.info(f"is_final type: {type(result['is_final'])}, value: {result['is_final']}")
+            logging.debug(f"is_final type: {type(result['is_final'])}, value: {result['is_final']}")
         
         socketio.emit("transcription_update", result)
     
@@ -189,8 +189,8 @@ def initialize_provider(provider_name: str, provider_id: int, config_options=Non
 def handle_audio_stream(data):
     global active_providers
     
-    logging.info(f"Received audio stream data: {type(data)} with keys {data.keys()}")
-    logging.info(f"AUDIO: Current active_providers: {list(active_providers.keys())}")
+    logging.debug(f"Received audio stream data: {type(data)} with keys {data.keys()}")
+    logging.debug(f"AUDIO: Current active_providers: {list(active_providers.keys())}")
     
     # Extract just the audio data from the message
     audio_data = data.get('data')
@@ -201,10 +201,10 @@ def handle_audio_stream(data):
         if provider_id in active_providers:
             provider = active_providers[provider_id]
             provider_type = type(provider).__name__
-            logging.info(f"AUDIO: Found provider {provider_id} of type {provider_type}")
+            logging.debug(f"AUDIO: Found provider {provider_id} of type {provider_type}")
             
             if provider.is_connected:
-                logging.info(f"AUDIO: Provider {provider_id} is connected, sending {len(audio_data)} bytes")
+                logging.debug(f"AUDIO: Provider {provider_id} is connected, sending {len(audio_data)} bytes")
                 provider.send(audio_data)
             else:
                 logging.error(f"AUDIO: Provider {provider_id} is not connected, cannot send audio data")
@@ -325,14 +325,6 @@ def server_connect():
     logging.info("Client connected")
 
 if __name__ == "__main__":
-    # Create a custom filter to exclude Deepgram NOTICE logs
-    class DeepgramNoticeFilter(logging.Filter):
-        def filter(self, record):
-            # Filter out Deepgram NOTICE logs
-            if record.levelname == 'NOTICE' and 'deepgram' in record.name.lower():
-                return False
-            return True
-
     # Create a custom formatter with colors based on provider
     class ColoredFormatter(logging.Formatter):
         def format(self, record):
@@ -352,12 +344,6 @@ if __name__ == "__main__":
             elif 'WARNING' in record.levelname:
                 # Yellow for warnings
                 log_fmt = f"{LogColors.YELLOW}%(levelname)s:%(name)s:%(message)s{LogColors.RESET}"
-            elif 'INIT' in record.getMessage() or 'TOGGLE' in record.getMessage():
-                # Cyan for initialization and toggle events
-                log_fmt = f"{LogColors.CYAN}%(levelname)s:%(name)s:%(message)s{LogColors.RESET}"
-            elif 'AUDIO' in record.getMessage():
-                # Magenta for audio events
-                log_fmt = f"{LogColors.MAGENTA}%(levelname)s:%(name)s:%(message)s{LogColors.RESET}"
                 
             formatter = logging.Formatter(log_fmt)
             return formatter.format(record)
@@ -373,7 +359,6 @@ if __name__ == "__main__":
     # Create and add the new handler with our custom formatter
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(ColoredFormatter())
-    stream_handler.addFilter(DeepgramNoticeFilter())
     root_logger.addHandler(stream_handler)
 
     # Suppress Deepgram websocket logs
