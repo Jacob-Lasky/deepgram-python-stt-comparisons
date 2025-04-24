@@ -580,15 +580,6 @@ function updateConfigPanelForProvider(provider, providerType) {
     providerLabels.forEach(label => {
         label.style.display = 'block';
     });
-    
-    // // Update URL display
-    // const urlDisplay = provider.getElement('.url-display');
-    // if (urlDisplay) {
-    //     urlDisplay.style.display = 'block';
-    // }
-    
-    // // Update the request URL display
-    // updateRequestUrl(getConfig(provider), provider);
 }
 
 function addProvider() {
