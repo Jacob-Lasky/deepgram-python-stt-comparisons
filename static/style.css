@@ -281,7 +281,7 @@ h1 {
   color: rgba(255, 255, 255, 0.5);
 }
 
-.url-display {
+/* .url-display {
   width: 100%;
   padding: 12px;
   background: rgba(255, 255, 255, 0.08);
@@ -295,7 +295,7 @@ h1 {
   position: relative;
   max-height: 30vh;
   overflow-y: auto;
-}
+} */
 
 .url-buttons {
   position: absolute;

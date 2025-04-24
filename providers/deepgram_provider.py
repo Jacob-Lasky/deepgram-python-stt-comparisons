@@ -99,11 +99,6 @@ class DeepgramProvider(BaseSTTProvider):
         transcript = result.channel.alternatives[0].transcript
         if len(transcript) > 0:
             timing = {"start": result.start, "end": result.start + result.duration}
-            logging.info("==============================")
-            logging.info(f"Deepgram transcription: {transcript}")
-            logging.info(f"Is final: {result.is_final}")
-            logging.info(f"Timing: {timing}")
-            logging.info("==============================")
             self.on_transcription({
                 "transcription": transcript,
                 "is_final": result.is_final,

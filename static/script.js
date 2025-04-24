@@ -431,8 +431,12 @@ async function openMicrophone(microphone, socket, provider) {
       resolve();
     };
     microphone.ondataavailable = async (event) => {
-      console.log(`Client: Microphone data received for provider ${provider.id}`);
+      console.log(`Client: Microphone data received for provider ${provider.id}, size: ${event.data.size} bytes`);
       if (event.data.size > 0) {
+        // Get the provider type for logging
+        const providerType = provider.getElement('.provider-select').value;
+        console.log(`Sending audio data to ${providerType} provider ${provider.id}`);
+        
         socket.emit("audio_stream", { data: event.data, providerId: provider.id });
       }
     };
@@ -462,7 +466,29 @@ async function startRecording(provider) {
   const chevron = provider.getElement('.config-header i');
   if (chevron) chevron.style.transform = 'rotate(-90deg)';
   
-  socket.emit("toggle_transcription", { action: "start", config: config, providerId: provider.id });
+  // Get the provider type from the dropdown
+  const providerType = provider.getElement('.provider-select').value;
+  console.log(`Starting recording with provider type: ${providerType}`);
+  
+  // Create the data object to send
+  const data = { 
+    action: "start", 
+    config: config, 
+    providerId: provider.id,
+    provider: providerType  // Include the provider type
+  };
+  
+  console.log('Sending toggle_transcription event with data:', JSON.stringify(data));
+  
+  // Add event listeners to track if the server acknowledges the event
+  const ackTimeout = setTimeout(() => {
+    console.warn('No acknowledgment received from server for toggle_transcription event');
+  }, 2000);
+  
+  socket.emit("toggle_transcription", data, (response) => {
+    clearTimeout(ackTimeout);
+    console.log('Server acknowledged toggle_transcription event:', response);
+  });
   
   await openMicrophone(provider.microphone, socket, provider);
 }
@@ -471,7 +497,20 @@ async function stopRecording(provider) {
   if (provider.isRecording === true) {
     provider.microphone.stop();
     provider.microphone.stream.getTracks().forEach((track) => track.stop()); // Stop all tracks
-    socket.emit("toggle_transcription", { action: "stop", providerId: provider.id });
+    
+    // Get the provider type from the dropdown
+    const providerType = provider.getElement('.provider-select').value;
+    
+    // Create the data object to send
+    const data = { 
+      action: "stop", 
+      providerId: provider.id,
+      provider: providerType  // Include the provider type
+    };
+    
+    console.log('Sending stop event with data:', JSON.stringify(data));
+    
+    socket.emit("toggle_transcription", data);
     provider.microphone = null;
     provider.isRecording = false;
     console.log(`Client: Microphone closed for provider ${provider.id}`);
@@ -654,14 +693,14 @@ function updateConfigPanelForProvider(provider, providerType) {
         label.style.display = 'block';
     });
     
-    // Update URL display
-    const urlDisplay = provider.getElement('.url-display');
-    if (urlDisplay) {
-        urlDisplay.style.display = 'block';
-    }
+    // // Update URL display
+    // const urlDisplay = provider.getElement('.url-display');
+    // if (urlDisplay) {
+    //     urlDisplay.style.display = 'block';
+    // }
     
-    // Update the request URL display
-    updateRequestUrl(getConfig(provider), provider);
+    // // Update the request URL display
+    // updateRequestUrl(getConfig(provider), provider);
 }
 
 function addProvider() {
@@ -814,6 +853,20 @@ function initializeProvider(id) {
     const importButton = provider.getElement('.import-button');
     const importInput = provider.getElement('.importInput');
     const providerSelect = provider.getElement('.provider-select');
+    
+    // Add event listener for provider type change
+    if (providerSelect) {
+        providerSelect.addEventListener('change', () => {
+            const selectedProvider = providerSelect.value;
+            console.log(`Provider type changed to: ${selectedProvider}`);
+            updateConfigPanelForProvider(provider, selectedProvider);
+            // Reset to provider-specific defaults
+            resetConfig(provider);
+        });
+        
+        // Initialize the config panel for the current provider type
+        updateConfigPanelForProvider(provider, providerSelect.value);
+    }
 
     // Initialize record button
     if (recordButton) {

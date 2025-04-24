@@ -24,28 +24,41 @@ PROVIDER_CONFIGS = {}
 # Load provider configurations
 try:
     # Load Deepgram config
-    with open("config/providers/deepgram.json", "r") as f:
+    with open("static/config/providers/deepgram.json", "r") as f:
         PROVIDER_CONFIGS["deepgram"] = json.load(f)
+        logging.info("Successfully loaded Deepgram provider config")
     
     # Load Microsoft config
-    with open("config/providers/microsoft.json", "r") as f:
+    with open("static/config/providers/microsoft.json", "r") as f:
         PROVIDER_CONFIGS["microsoft"] = json.load(f)
+        logging.info("Successfully loaded Microsoft provider config")
     
     # Use Deepgram as the default config for backward compatibility
     DEFAULT_CONFIG = PROVIDER_CONFIGS["deepgram"]
+    logging.info("Using Deepgram as default config")
 except Exception as e:
     logging.error(f"Error loading provider configs: {e}")
     # Fallback to defaults.json if provider configs fail to load
     try:
-        with open("config/defaults.json", "r") as f:
+        with open("static/config/defaults.json", "r") as f:
             DEFAULT_CONFIG = json.load(f)
+            logging.info("Using defaults.json as fallback")
     except Exception as e:
         logging.error(f"Error loading default config: {e}")
         DEFAULT_CONFIG = {}
+        logging.info("Using empty default config as fallback")
 
 # Initialize provider registry
 providers = Providers()
 active_providers = {}  # Dictionary to store active providers by ID
+
+# Function to debug active_providers
+def debug_active_providers():
+    logging.info(f"DEBUG: active_providers contains {len(active_providers)} items")
+    for pid, provider in active_providers.items():
+        provider_type = type(provider).__name__
+        is_connected = provider.is_connected if hasattr(provider, 'is_connected') else 'unknown'
+        logging.info(f"DEBUG: Provider {pid} is of type {provider_type}, connected: {is_connected}")
 
 def create_transcription_callback(provider_id):
     """Create a callback function for a specific provider ID."""
@@ -74,117 +87,243 @@ def index():
 def initialize_provider(provider_name: str, provider_id: int, config_options=None):
     global active_providers, PROVIDER_CONFIGS
     
+    logging.info(f"INIT: Initializing provider '{provider_name}' with ID {provider_id}")
+    logging.info(f"INIT: Current active_providers: {list(active_providers.keys())}")
+    
     # Stop the provider if it's already active
     if provider_id in active_providers:
+        logging.info(f"INIT: Provider ID {provider_id} already active, stopping it first")
         active_providers[provider_id].stop()
         
     # Get provider-specific default config
     provider_default_config = PROVIDER_CONFIGS.get(provider_name, {})
+    logging.info(f"INIT: Loaded default config for provider '{provider_name}'")
     
     if provider_name == "deepgram":
+        logging.info("INIT: Initializing Deepgram provider")
         # get API key from .env file
         api_key = os.getenv("DEEPGRAM_API_KEY")
         if not api_key:
-            logging.error("No Deepgram API key found in environment")
+            logging.error("INIT: No Deepgram API key found in environment")
             return False
+        logging.info("INIT: Found Deepgram API key in environment")
         
         # Create a callback specific to this provider ID
         callback = create_transcription_callback(provider_id)
+        logging.info("INIT: Created callback for Deepgram provider")
         
         # Merge provider default config with user-provided config
         merged_config = provider_default_config.copy()
         if config_options:
             merged_config.update(config_options)
+        logging.info(f"INIT: Merged config for Deepgram: {merged_config}")
         
         provider = DeepgramProvider(api_key, callback)
+        logging.info("INIT: Created Deepgram provider instance")
+        
         if not provider.initialize(merged_config):
-            logging.error(f"Failed to initialize Deepgram provider {provider_id}")
+            logging.error(f"INIT: Failed to initialize Deepgram provider {provider_id}")
             return False
+        logging.info(f"INIT: Successfully initialized Deepgram provider {provider_id}")
             
         providers.add_provider(f"{provider_name}_{provider_id}", provider)
         active_providers[provider_id] = provider
+        logging.info(f"INIT: Added Deepgram provider {provider_id} to active providers")
         return True
     
     elif provider_name == "microsoft":
+        logging.info("INIT: Initializing Microsoft provider")
         # get API key and region from .env file
         api_key = os.getenv("AZURE_SPEECH_KEY")
         region = os.getenv("AZURE_SPEECH_REGION")
+        
+        logging.info(f"INIT: Microsoft API key available: {'Yes' if api_key else 'No'}")
+        logging.info(f"INIT: Microsoft region available: {'Yes' if region else 'No'}")
+        
         if not api_key or not region:
-            logging.error("No Microsoft Speech API key or region found in environment")
+            logging.error("INIT: No Microsoft Speech API key or region found in environment")
             return False
         
         # Create a callback specific to this provider ID
         callback = create_transcription_callback(provider_id)
+        logging.info("INIT: Created callback for Microsoft provider")
         
         # Merge provider default config with user-provided config
         merged_config = provider_default_config.copy()
         if config_options:
             merged_config.update(config_options)
+        logging.info(f"INIT: Merged config for Microsoft: {merged_config}")
         
+        logging.info("INIT: Creating Microsoft provider instance")
         provider = MicrosoftProvider(api_key, region, callback)
+        logging.info("INIT: Created Microsoft provider instance")
+        
+        logging.info("INIT: Initializing Microsoft provider with config")
         if not provider.initialize(merged_config):
-            logging.error(f"Failed to initialize Microsoft provider {provider_id}")
+            logging.error(f"INIT: Failed to initialize Microsoft provider {provider_id}")
             return False
+        logging.info(f"INIT: Successfully initialized Microsoft provider {provider_id}")
             
         providers.add_provider(f"{provider_name}_{provider_id}", provider)
         active_providers[provider_id] = provider
+        logging.info(f"INIT: Added Microsoft provider {provider_id} to active providers")
+        logging.info(f"INIT: Updated active_providers: {list(active_providers.keys())}")
         return True
     
-    logging.error(f"Unknown provider: {provider_name}")
+    logging.error(f"INIT: Unknown provider: {provider_name}")
     return False
 
 # SocketIO event handlers
 @socketio.on("audio_stream")
 def handle_audio_stream(data):
+    global active_providers
+    
     logging.info(f"Received audio stream data: {type(data)} with keys {data.keys()}")
+    logging.info(f"AUDIO: Current active_providers: {list(active_providers.keys())}")
+    
     # Extract just the audio data from the message
     audio_data = data.get('data')
     provider_id = data.get('providerId')
     
     if audio_data and provider_id is not None:
         # Only send to the specific provider it was intended for
-        if provider_id in active_providers and active_providers[provider_id].is_connected:
-            logging.info(f"Sending audio data to provider {provider_id}")
-            active_providers[provider_id].send(audio_data)
+        if provider_id in active_providers:
+            provider = active_providers[provider_id]
+            provider_type = type(provider).__name__
+            logging.info(f"AUDIO: Found provider {provider_id} of type {provider_type}")
+            
+            if provider.is_connected:
+                logging.info(f"AUDIO: Provider {provider_id} is connected, sending {len(audio_data)} bytes")
+                provider.send(audio_data)
+            else:
+                logging.error(f"AUDIO: Provider {provider_id} is not connected, cannot send audio data")
+        else:
+            logging.error(f"AUDIO: Provider ID {provider_id} not found in active_providers")
+            logging.info(f"AUDIO: Active providers: {list(active_providers.keys())}")
     else:
-        logging.warning("Received audio data without provider ID or audio data")
+        if not audio_data:
+            logging.warning("AUDIO: No audio data received")
+        if provider_id is None:
+            logging.warning("AUDIO: No provider ID received")
 
 @socketio.on("toggle_transcription")
 def handle_toggle_transcription(data):
     global active_providers
     
     logging.info(f"Received toggle_transcription event with data: {data}")
+    logging.info(f"TOGGLE: Current active_providers before processing: {list(active_providers.keys())}")
     
     action = data.get("action")
     provider_name = data.get("provider", "deepgram")
     provider_id = data.get("providerId", 0)
+    
+    logging.info(f"PROVIDER SELECTION: Action={action}, Provider={provider_name}, ID={provider_id}")
+    
+    result = {"success": False, "message": "Unknown action"}
     
     if action == "start":
         logging.info(f"Starting {provider_name} connection for provider ID {provider_id}")
         config = data.get("config", {})
         logging.info(f"Using config: {config}")
         
-        if initialize_provider(provider_name, provider_id, config):
-            active_providers[provider_id].start(config)
-            logging.info(f"Started {provider_name} provider {provider_id} successfully")
+        # Log environment variables for debugging
+        if provider_name == "microsoft":
+            azure_key = os.getenv("AZURE_SPEECH_KEY")
+            azure_region = os.getenv("AZURE_SPEECH_REGION")
+            logging.info(f"Azure credentials available: Key={'✓' if azure_key else '✗'}, Region={'✓' if azure_region else '✗'}")
+            if azure_region:
+                logging.info(f"Azure region: {azure_region}")
+        
+        logging.info(f"About to initialize {provider_name} provider...")
+        init_success = initialize_provider(provider_name, provider_id, config)
+        logging.info(f"Provider initialization result: {init_success}")
+        
+        if init_success:
+            logging.info(f"Provider initialized successfully, starting {provider_name}...")
+            
+            # Double-check that provider was added to active_providers
+            if provider_id not in active_providers:
+                logging.error(f"CRITICAL: Provider {provider_id} not found in active_providers after initialization!")
+                # Try to re-initialize
+                if provider_name == "microsoft":
+                    api_key = os.getenv("AZURE_SPEECH_KEY")
+                    region = os.getenv("AZURE_SPEECH_REGION")
+                    callback = create_transcription_callback(provider_id)
+                    provider = MicrosoftProvider(api_key, region, callback)
+                    if provider.initialize(config):
+                        providers.add_provider(f"{provider_name}_{provider_id}", provider)
+                        active_providers[provider_id] = provider
+                        logging.info(f"Re-initialized Microsoft provider {provider_id} and added to active_providers")
+                    else:
+                        logging.error(f"Failed to re-initialize Microsoft provider {provider_id}")
+                        result = {"success": False, "message": f"Failed to initialize {provider_name} provider {provider_id}"}
+                        return result
+            
+            # Now start the provider
+            start_success = active_providers[provider_id].start(config)
+            logging.info(f"Provider start result: {start_success}")
+            
+            if start_success:
+                logging.info(f"Started {provider_name} provider {provider_id} successfully")
+                logging.info(f"Active providers after start: {list(active_providers.keys())}")
+                # Double-check that the provider is actually in active_providers
+                if provider_id in active_providers:
+                    logging.info(f"Confirmed provider {provider_id} is in active_providers")
+                    # Debug the provider's connection status
+                    provider = active_providers[provider_id]
+                    is_connected = provider.is_connected if hasattr(provider, 'is_connected') else 'unknown'
+                    logging.info(f"Provider {provider_id} connection status: {is_connected}")
+                    debug_active_providers()
+                else:
+                    logging.error(f"CRITICAL: Provider {provider_id} not found in active_providers after successful start!")
+                result = {"success": True, "message": f"Started {provider_name} provider {provider_id} successfully"}
+            else:
+                error_msg = f"Failed to start {provider_name} provider {provider_id}"
+                logging.error(error_msg)
+                result = {"success": False, "message": error_msg}
         else:
-            logging.error(f"Failed to initialize {provider_name} provider {provider_id}")
+            error_msg = f"Failed to initialize {provider_name} provider {provider_id}"
+            logging.error(error_msg)
+            result = {"success": False, "message": error_msg}
     
     elif action == "stop":
+        logging.info(f"Attempting to stop provider {provider_id}")
+        logging.info(f"Current active providers: {list(active_providers.keys())}")
+        
         if provider_id in active_providers:
             logging.info(f"Stopping {provider_name} provider {provider_id}")
             active_providers[provider_id].stop()
             del active_providers[provider_id]
+            logging.info(f"Provider {provider_id} stopped and removed from active providers")
+            logging.info(f"Active providers after stop: {list(active_providers.keys())}")
+            result = {"success": True, "message": f"Stopped {provider_name} provider {provider_id} successfully"}
         else:
-            logging.warning(f"No active provider with ID {provider_id}")
+            error_msg = f"No active provider with ID {provider_id}"
+            logging.warning(error_msg)
+            result = {"success": False, "message": error_msg}
     else:
-        logging.warning(f"Invalid action '{action}'")
+        error_msg = f"Invalid action '{action}'"
+        logging.warning(error_msg)
+        result = {"success": False, "message": error_msg}
+        
+    # Return acknowledgment to the client
+    return result
 
 @socketio.on("connect")
 def server_connect():
     logging.info("Client connected")
 
 if __name__ == "__main__":
+    # Configure logging
     logging.basicConfig(level=logging.INFO)
+    
+    # Suppress Deepgram websocket logs
+    deepgram_loggers = [
+        'deepgram.clients.listen_router',
+        'deepgram.clients.common.v1.abstract_sync_websocket'
+    ]
+    for logger_name in deepgram_loggers:
+        logging.getLogger(logger_name).setLevel(logging.ERROR)
+    
     logging.info("Starting combined Flask-SocketIO server")
     socketio.run(app, debug=True, allow_unsafe_werkzeug=True, port=8001)
