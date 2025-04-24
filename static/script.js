@@ -431,14 +431,6 @@ function getConfig(provider) {
         config.extra = {};
     }
     
-    // For Microsoft, map some fields differently
-    if (providerType === 'microsoft') {
-        // Use microsoft_language instead of language
-        if (config.microsoft_language) {
-            config.language = config.microsoft_language;
-        }
-    }
-    
     console.log(`Generated config for ${providerType}:`, config);
     return config;
 }
