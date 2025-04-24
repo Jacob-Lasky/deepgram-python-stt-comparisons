@@ -10,6 +10,17 @@ from providers import Providers, DeepgramProvider, MicrosoftProvider
 
 load_dotenv()
 
+# Define colors for logging
+class LogColors:
+    RESET = '\033[0m'
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    BLUE = '\033[34m'
+    MAGENTA = '\033[35m'
+    CYAN = '\033[36m'
+    WHITE = '\033[37m'
+
 # Initialize Flask and SocketIO
 app = Flask(__name__)
 socketio = SocketIO(
@@ -314,9 +325,57 @@ def server_connect():
     logging.info("Client connected")
 
 if __name__ == "__main__":
+    # Create a custom filter to exclude Deepgram NOTICE logs
+    class DeepgramNoticeFilter(logging.Filter):
+        def filter(self, record):
+            # Filter out Deepgram NOTICE logs
+            if record.levelname == 'NOTICE' and 'deepgram' in record.name.lower():
+                return False
+            return True
+
+    # Create a custom formatter with colors based on provider
+    class ColoredFormatter(logging.Formatter):
+        def format(self, record):
+            # Default format
+            log_fmt = '%(levelname)s:%(name)s:%(message)s'
+            
+            # Add colors based on the provider
+            if 'MSFT' in record.getMessage() or 'microsoft' in record.name.lower():
+                # Blue for Microsoft
+                log_fmt = f"{LogColors.BLUE}%(levelname)s:%(name)s:%(message)s{LogColors.RESET}"
+            elif 'DG' in record.getMessage() or 'deepgram' in record.name.lower():
+                # Green for Deepgram
+                log_fmt = f"{LogColors.GREEN}%(levelname)s:%(name)s:%(message)s{LogColors.RESET}"
+            elif 'ERROR' in record.levelname:
+                # Red for errors
+                log_fmt = f"{LogColors.RED}%(levelname)s:%(name)s:%(message)s{LogColors.RESET}"
+            elif 'WARNING' in record.levelname:
+                # Yellow for warnings
+                log_fmt = f"{LogColors.YELLOW}%(levelname)s:%(name)s:%(message)s{LogColors.RESET}"
+            elif 'INIT' in record.getMessage() or 'TOGGLE' in record.getMessage():
+                # Cyan for initialization and toggle events
+                log_fmt = f"{LogColors.CYAN}%(levelname)s:%(name)s:%(message)s{LogColors.RESET}"
+            elif 'AUDIO' in record.getMessage():
+                # Magenta for audio events
+                log_fmt = f"{LogColors.MAGENTA}%(levelname)s:%(name)s:%(message)s{LogColors.RESET}"
+                
+            formatter = logging.Formatter(log_fmt)
+            return formatter.format(record)
+
     # Configure logging
-    logging.basicConfig(level=logging.INFO)
-    
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # Remove existing handlers
+    for handler in root_logger.handlers[:]:  
+        root_logger.removeHandler(handler)
+
+    # Create and add the new handler with our custom formatter
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(ColoredFormatter())
+    stream_handler.addFilter(DeepgramNoticeFilter())
+    root_logger.addHandler(stream_handler)
+
     # Suppress Deepgram websocket logs
     deepgram_loggers = [
         'deepgram.clients.listen_router',
@@ -324,6 +383,6 @@ if __name__ == "__main__":
     ]
     for logger_name in deepgram_loggers:
         logging.getLogger(logger_name).setLevel(logging.ERROR)
-    
+
     logging.info("Starting combined Flask-SocketIO server")
     socketio.run(app, debug=True, allow_unsafe_werkzeug=True, port=8001)

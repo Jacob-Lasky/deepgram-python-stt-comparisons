@@ -30,6 +30,7 @@ class DeepgramProvider(BaseSTTProvider):
     def initialize(self, config: Dict[str, Any]) -> bool:
         """Initialize the Deepgram client with configuration."""
         try:
+            logging.info(f"DG: Initializing Deepgram provider with config: {config}")
             if "baseUrl" in config:
                 base_url = config.pop("baseUrl")
                 self._config.url = f"wss://{base_url}"
@@ -45,13 +46,13 @@ class DeepgramProvider(BaseSTTProvider):
             
             return True
         except Exception as e:
-            logging.error(f"Failed to initialize Deepgram: {e}")
+            logging.error(f"DG: Failed to initialize Deepgram: {e}")
             return False
 
     def start(self, options: Dict[str, Any]) -> bool:
         """Start the Deepgram connection with the given options."""
         if not self.connection:
-            logging.error("Deepgram connection not initialized")
+            logging.error("DG: Deepgram connection not initialized")
             return False
         
         # Filter out parameters that aren't valid for Deepgram LiveOptions
@@ -70,7 +71,7 @@ class DeepgramProvider(BaseSTTProvider):
             if key in deepgram_params:
                 valid_params[key] = value
         
-        logging.info(f"Filtered Deepgram options: {valid_params}")
+        logging.info(f"DG: Filtered Deepgram options: {valid_params}")
         live_options = LiveOptions(**valid_params)
         return self.connection.start(live_options)
 
@@ -82,8 +83,14 @@ class DeepgramProvider(BaseSTTProvider):
     def stop(self) -> None:
         """Stop the Deepgram connection."""
         if self.connection:
-            self.connection.finish()
-            self.connection = None
+            try:
+                logging.info("DG: Stopping Deepgram connection")
+                self.connection.finish()
+                logging.info("DG: Stopped Deepgram connection successfully")
+            except Exception as e:
+                logging.error(f"DG: Error stopping Deepgram connection: {e}")
+            finally:
+                self.connection = None
 
     @property
     def is_connected(self) -> bool:
@@ -92,7 +99,7 @@ class DeepgramProvider(BaseSTTProvider):
 
     def _on_open(self, client, open_event, **kwargs):
         """Handle connection open event."""
-        logging.info(f"Deepgram connection opened: {open_event}")
+        logging.info(f"DG: Deepgram connection opened: {open_event}")
 
     def _on_message(self, client, result, **kwargs):
         """Handle transcription message event."""
@@ -107,8 +114,8 @@ class DeepgramProvider(BaseSTTProvider):
 
     def _on_close(self, client, close_event, **kwargs):
         """Handle connection close event."""
-        logging.info(f"Deepgram connection closed: {close_event}")
+        logging.info(f"DG: Deepgram connection closed: {close_event}")
 
     def _on_error(self, client, error, **kwargs):
         """Handle error event."""
-        logging.error(f"Deepgram error: {error}")
+        logging.error(f"DG: Deepgram error: {error}")
