@@ -238,9 +238,6 @@ function setDefaultValues(provider) {
                     extraParams.value = JSON.stringify(config.extra, null, 2);
                 }
             }
-            
-            // Update the URL display
-            updateRequestUrl(getConfig(provider), provider);
         })
 }
 
@@ -274,15 +271,11 @@ function resetConfig(provider) {
                     extraParams.value = JSON.stringify(config.extra, null, 2);
                 }
             }
-            
-            // Update the URL display
-            updateRequestUrl(getConfig(provider), provider);
         })
         .catch(error => {
             console.error(`Error loading ${providerType} configuration:`, error);
             // Fallback to default values
             setDefaultValues(provider);
-            updateRequestUrl(getConfig(provider), provider);
         });
 }
 
@@ -330,9 +323,6 @@ async function startRecording(provider) {
   
   // Update the UI to show interim_results is true
   provider.getElement('.interim_results').checked = true;
-  
-  // Update the URL display to show interim_results=true
-  updateRequestUrl(config, provider);
   
   // Collapse the configuration panel
   const configContent = provider.getElement('.config-content');
@@ -392,7 +382,6 @@ async function stopRecording(provider) {
     
     // Reset interim_results to the checkbox state
     const config = getConfig(provider);
-    updateRequestUrl(config, provider);
   }
 }
 
@@ -472,77 +461,6 @@ function toggleConfig(element) {
             if (chevron) chevron.style.transform = 'rotate(0deg)';
         }
     });
-}
-
-function updateRequestUrl(config, provider) {
-    const urlElement = provider.getElement('.requestUrl');
-    if (!urlElement) return;
-
-    const providerType = provider.getElement('.provider-select').value;
-    
-    if (providerType === 'deepgram') {
-        // Build Deepgram URL
-        let baseUrl = config.base_url || 'api.deepgram.com';
-        let url = `wss://${baseUrl}/v1/listen?`;
-        
-        // Add model if specified
-        if (config.model) {
-            url += `model=${encodeURIComponent(config.model)}&`;
-        }
-        
-        // Add language if specified
-        if (config.language) {
-            url += `language=${encodeURIComponent(config.language)}&`;
-        }
-        
-        // Add boolean parameters
-        const boolParams = [
-            'smart_format',
-            'interim_results',
-            'no_delay',
-            'dictation',
-            'numerals',
-            'profanity_filter',
-            'redact'
-        ];
-        
-        boolParams.forEach(param => {
-            if (config[param] === true) {
-                url += `${param}=true&`;
-            }
-        });
-        
-        // Add numeric parameters
-        if (config.utterance_end_ms) {
-            url += `utterance_end_ms=${encodeURIComponent(config.utterance_end_ms)}&`;
-        }
-        
-        if (config.endpointing) {
-            url += `endpointing=${encodeURIComponent(config.endpointing)}&`;
-        }
-        
-        // Add extra parameters
-        if (config.extra && typeof config.extra === 'object') {
-            Object.entries(config.extra).forEach(([key, value]) => {
-                if (value !== undefined && value !== null) {
-                    url += `${encodeURIComponent(key)}=${encodeURIComponent(value)}&`;
-                }
-            });
-        }
-        
-        // Remove trailing ampersand or question mark
-        if (url.endsWith('&')) {
-            url = url.slice(0, -1);
-        } else if (url.endsWith('?')) {
-            url = url.slice(0, -1);
-        }
-        
-        urlElement.textContent = url;
-    } else if (providerType === 'microsoft') {
-        // Build Microsoft URL representation (just for display)
-        let url = `Microsoft Speech SDK - ${config.microsoft_language || 'en-US'}`;
-        urlElement.textContent = url;
-    }
 }
 
 function toggleExtraParams(element) {
@@ -709,8 +627,7 @@ function parseUrlParams(url) {
     const configUrl = `../config/providers/${providerType}.json`;
     
     fetch(configUrl)
-        .then(response => response.json())
-        .then(updateRequestUrl(getConfig()));
+        .then(response => response.json());
 
 function initializeProvider(id) {
     const provider = providers.find(p => p.id === id);
@@ -757,7 +674,6 @@ function initializeProvider(id) {
             resetConfig(provider);
             provider.changedParams.clear();
             provider.isImported = false;
-            updateRequestUrl(getConfig(), provider);
         });
     }
 
@@ -780,7 +696,6 @@ function initializeProvider(id) {
         inputs.forEach(input => {
             input.addEventListener(eventType, () => {
                 provider.changedParams.add(input.className);
-                updateRequestUrl(getConfig(provider), provider);
             });
         });
     });
@@ -821,9 +736,6 @@ function initializeProvider(id) {
         // Initialize the configuration panel based on the current provider type
         updateConfigPanelForProvider(provider, providerSelect.value);
     }
-
-    // Initialize with provider config
-    updateRequestUrl(getConfig(), provider);
 }
 
     // Make URL editable
@@ -864,9 +776,6 @@ function initializeProvider(id) {
                 });
                 provider.getElement('.extraParams').value = JSON.stringify(extraParams, null, 2);
                 
-                // Update URL display with proper wrapping and escaping
-                updateRequestUrl(getConfig(provider), provider);
-                
                 // Restore cursor position
                 try {
                     const newRange = document.createRange();
@@ -886,12 +795,10 @@ function initializeProvider(id) {
     configInputs.forEach(input => {
         input.addEventListener('change', () => {
             provider.changedParams.add(input.id);
-            updateRequestUrl(getConfig(provider), provider);
         });
         if (input.type === 'text') {
             input.addEventListener('input', () => {
                 provider.changedParams.add(input.id);
-                updateRequestUrl(getConfig(provider), provider);
             });
         }
     });
@@ -923,17 +830,8 @@ function initializeProvider(id) {
                 } else {
                     provider.changedParams.delete('extraParams');
                 }
-                updateRequestUrl(getConfig(provider), provider);
             } catch (e) {
                 console.warn('Invalid JSON in extra params');
             }
         });
     }
-
-    // Add resize listener to update URL formatting when window size changes
-    window.addEventListener('resize', () => {
-        updateRequestUrl(getConfig(provider), provider);
-    });
-
-    // Initialize with default config
-    updateRequestUrl(getConfig(provider), provider);
