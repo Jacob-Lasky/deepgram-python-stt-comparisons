@@ -379,7 +379,7 @@ function getConfig(provider) {
     textInputs.forEach(input => {
         // Check if the input's parent label is visible or has no data-provider attribute (common field)
         const parentLabel = input.closest('label');
-        const isCommonField = !parentLabel.hasAttribute('data-provider');
+        const isCommonField = parentLabel.getAttribute('data-provider') === 'common';
         const isProviderSpecific = parentLabel.getAttribute('data-provider') === providerType;
         
         if ((isCommonField || isProviderSpecific) && input.value) {
@@ -392,7 +392,7 @@ function getConfig(provider) {
     booleanInputs.forEach(input => {
         // Check if the input's parent label is visible or has no data-provider attribute (common field)
         const parentLabel = input.closest('label');
-        const isCommonField = !parentLabel.hasAttribute('data-provider');
+        const isCommonField = parentLabel.getAttribute('data-provider') === 'common';
         const isProviderSpecific = parentLabel.getAttribute('data-provider') === providerType;
         
         if (isCommonField || isProviderSpecific) {

@@ -451,22 +451,6 @@ h1 {
   }
 }
 
-#baseUrl {
-  width: calc(100% - 16px);
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  color: #fff;
-  font-family: monospace;
-  margin-top: 4px;
-  margin-bottom: 12px;
-}
-
-#baseUrl::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
 .config-columns {
   display: flex;
   gap: 20px;

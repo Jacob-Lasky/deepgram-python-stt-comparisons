@@ -31,9 +31,7 @@ class DeepgramProvider(BaseSTTProvider):
         """Initialize the Deepgram client with configuration."""
         try:
             logging.info(f"DG: Initializing Deepgram provider with config: {config}")
-            if "baseUrl" in config:
-                base_url = config.pop("baseUrl")
-                self._config.url = f"wss://{base_url}"
+            self._config.url = f"wss://api.deepgram.com"
             
             self.client = DeepgramClient(self.api_key, self._config)
             self.connection = self.client.listen.websocket.v("1")
@@ -54,25 +52,8 @@ class DeepgramProvider(BaseSTTProvider):
         if not self.connection:
             logging.error("DG: Deepgram connection not initialized")
             return False
-        
-        # Filter out parameters that aren't valid for Deepgram LiveOptions
-        valid_params = {}
-        # Known valid parameters for LiveOptions
-        deepgram_params = [
-            'model', 'language', 'encoding', 'channels', 'sample_rate', 
-            'endpointing', 'interim_results', 'punctuate', 'smart_format', 
-            'utterance_end_ms', 'vad_events', 'diarize', 'multichannel', 
-            'alternatives', 'numerals', 'profanity_filter', 'redact', 
-            'no_delay', 'dictation', 'search', 'replace', 'keywords', 
-            'callback_url', 'tag', 'language_detection', 'extra'
-        ]
-        
-        for key, value in options.items():
-            if key in deepgram_params:
-                valid_params[key] = value
-        
-        logging.info(f"DG: Filtered Deepgram options: {valid_params}")
-        live_options = LiveOptions(**valid_params)
+            
+        live_options = LiveOptions(**options)
         return self.connection.start(live_options)
 
     def send(self, audio_data: bytes) -> None:

@@ -77,6 +77,12 @@ class MicrosoftProvider(BaseSTTProvider):
             language = config.get("language", "en-US")
             self.speech_config.speech_recognition_language = language
             logging.info(f"MSFT: Set speech recognition language to {language}")
+
+            # Configure profanity filter
+            if config.get("profanity_filter", False):
+                self.speech_config.set_profanity(speechsdk.ProfanityOption.Masked)
+            else:
+                self.speech_config.set_profanity(speechsdk.ProfanityOption.Raw)
             
             # Set up the audio stream with ANY format to support WebM
             format = speechsdk.audio.AudioStreamFormat(compressed_stream_format=speechsdk.AudioStreamContainerFormat.ANY)

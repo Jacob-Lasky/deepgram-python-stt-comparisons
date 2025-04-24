@@ -1,5 +1,4 @@
 {
-    "base_url": "api.deepgram.com",
     "model": "nova-3",
     "language": "en",
     "utterance_end_ms": "1000",

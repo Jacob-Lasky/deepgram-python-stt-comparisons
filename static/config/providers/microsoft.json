@@ -1,4 +1,5 @@
 {
     "language": "en-US",
-    "interim_results": true
+    "interim_results": true,
+    "profanity_filter": false
 }

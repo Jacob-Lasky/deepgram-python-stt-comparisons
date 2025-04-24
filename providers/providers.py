@@ -1,6 +1,7 @@
 from typing import Dict, Optional
 from .base import BaseSTTProvider
 from .deepgram_provider import DeepgramProvider
+from .microsoft_provider import MicrosoftProvider
 
 class Providers:
     """Registry for STT providers."""
@@ -16,4 +17,4 @@ class Providers:
         """Get a provider by name."""
         return self.providers.get(name)
 
-__all__ = ['BaseSTTProvider', 'DeepgramProvider', 'Providers']
+__all__ = ['BaseSTTProvider', 'DeepgramProvider', 'MicrosoftProvider', 'Providers']
