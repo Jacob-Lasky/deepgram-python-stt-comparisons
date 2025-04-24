@@ -97,78 +97,88 @@ def initialize_provider(provider_name: str, provider_id: int, config_options=Non
     logging.info(f"INIT: Loaded default config for provider '{provider_name}'")
     
     if provider_name == "deepgram":
-        logging.info("INIT: Initializing Deepgram provider")
-        # get API key from .env file
-        api_key = os.getenv("DEEPGRAM_API_KEY")
-        if not api_key:
-            logging.error("INIT: No Deepgram API key found in environment")
-            return False
-        logging.info("INIT: Found Deepgram API key in environment")
-        
-        # Create a callback specific to this provider ID
-        callback = create_transcription_callback(provider_id)
-        logging.info("INIT: Created callback for Deepgram provider")
-        
-        # Merge provider default config with user-provided config
-        merged_config = provider_default_config.copy()
-        if config_options:
-            merged_config.update(config_options)
-        logging.info(f"INIT: Merged config for Deepgram: {merged_config}")
-        
-        provider = DeepgramProvider(api_key, callback)
-        logging.info("INIT: Created Deepgram provider instance")
-        
-        if not provider.initialize(merged_config):
-            logging.error(f"INIT: Failed to initialize Deepgram provider {provider_id}")
-            return False
-        logging.info(f"INIT: Successfully initialized Deepgram provider {provider_id}")
-            
-        providers.add_provider(f"{provider_name}_{provider_id}", provider)
-        active_providers[provider_id] = provider
-        logging.info(f"INIT: Added Deepgram provider {provider_id} to active providers")
-        return True
+        return initialize_deepgram(provider_default_config, provider_id, config_options)
     
     elif provider_name == "microsoft":
-        logging.info("INIT: Initializing Microsoft provider")
-        # get API key and region from .env file
-        api_key = os.getenv("AZURE_SPEECH_KEY")
-        region = os.getenv("AZURE_SPEECH_REGION")
-        
-        logging.info(f"INIT: Microsoft API key available: {'Yes' if api_key else 'No'}")
-        logging.info(f"INIT: Microsoft region available: {'Yes' if region else 'No'}")
-        
-        if not api_key or not region:
-            logging.error("INIT: No Microsoft Speech API key or region found in environment")
-            return False
-        
-        # Create a callback specific to this provider ID
-        callback = create_transcription_callback(provider_id)
-        logging.info("INIT: Created callback for Microsoft provider")
-        
-        # Merge provider default config with user-provided config
-        merged_config = provider_default_config.copy()
-        if config_options:
-            merged_config.update(config_options)
-        logging.info(f"INIT: Merged config for Microsoft: {merged_config}")
-        
-        logging.info("INIT: Creating Microsoft provider instance")
-        provider = MicrosoftProvider(api_key, region, callback)
-        logging.info("INIT: Created Microsoft provider instance")
-        
-        logging.info("INIT: Initializing Microsoft provider with config")
-        if not provider.initialize(merged_config):
-            logging.error(f"INIT: Failed to initialize Microsoft provider {provider_id}")
-            return False
-        logging.info(f"INIT: Successfully initialized Microsoft provider {provider_id}")
-            
-        providers.add_provider(f"{provider_name}_{provider_id}", provider)
-        active_providers[provider_id] = provider
-        logging.info(f"INIT: Added Microsoft provider {provider_id} to active providers")
-        logging.info(f"INIT: Updated active_providers: {list(active_providers.keys())}")
-        return True
+        return initialize_microsoft(provider_default_config, provider_id, config_options)
     
-    logging.error(f"INIT: Unknown provider: {provider_name}")
-    return False
+    else:
+        logging.error(f"INIT: Unknown provider: {provider_name}")
+        return False
+
+
+def initialize_deepgram(provider_default_config, provider_id, config_options=None, provider_name="deepgram"):
+    logging.info("INIT: Initializing Deepgram provider")
+    # get API key from .env file
+    api_key = os.getenv("DEEPGRAM_API_KEY")
+    if not api_key:
+        logging.error("INIT: No Deepgram API key found in environment")
+        return False
+    logging.info("INIT: Found Deepgram API key in environment")
+        
+    # Create a callback specific to this provider ID
+    callback = create_transcription_callback(provider_id)
+    logging.info("INIT: Created callback for Deepgram provider")
+    
+    # Merge provider default config with user-provided config
+    merged_config = provider_default_config.copy()
+    if config_options:
+        merged_config.update(config_options)
+    logging.info(f"INIT: Merged config for Deepgram: {merged_config}")
+    
+    provider = DeepgramProvider(api_key, callback)
+    logging.info("INIT: Created Deepgram provider instance")
+    
+    if not provider.initialize(merged_config):
+        logging.error(f"INIT: Failed to initialize Deepgram provider {provider_id}")
+        return False
+    logging.info(f"INIT: Successfully initialized Deepgram provider {provider_id}")
+        
+    providers.add_provider(f"{provider_name}_{provider_id}", provider)
+    active_providers[provider_id] = provider
+    logging.info(f"INIT: Added Deepgram provider {provider_id} to active providers")
+    return True
+
+
+def initialize_microsoft(provider_default_config, provider_id, config_options=None, provider_name="microsoft"):
+    logging.info("INIT: Initializing Microsoft provider")
+    # get API key and region from .env file
+    api_key = os.getenv("AZURE_SPEECH_KEY")
+    region = os.getenv("AZURE_SPEECH_REGION")
+        
+    logging.info(f"INIT: Microsoft API key available: {'Yes' if api_key else 'No'}")
+    logging.info(f"INIT: Microsoft region available: {'Yes' if region else 'No'}")
+        
+    if not api_key or not region:
+        logging.error("INIT: No Microsoft Speech API key or region found in environment")
+        return False
+        
+    # Create a callback specific to this provider ID
+    callback = create_transcription_callback(provider_id)
+    logging.info("INIT: Created callback for Microsoft provider")
+    
+    # Merge provider default config with user-provided config
+    merged_config = provider_default_config.copy()
+    if config_options:
+        merged_config.update(config_options)
+    logging.info(f"INIT: Merged config for Microsoft: {merged_config}")
+    
+    logging.info("INIT: Creating Microsoft provider instance")
+    provider = MicrosoftProvider(api_key, region, callback)
+    logging.info("INIT: Created Microsoft provider instance")
+    
+    logging.info("INIT: Initializing Microsoft provider with config")
+    if not provider.initialize(merged_config):
+        logging.error(f"INIT: Failed to initialize Microsoft provider {provider_id}")
+        return False
+    logging.info(f"INIT: Successfully initialized Microsoft provider {provider_id}")
+        
+    providers.add_provider(f"{provider_name}_{provider_id}", provider)
+    active_providers[provider_id] = provider
+    logging.info(f"INIT: Added Microsoft provider {provider_id} to active providers")
+    logging.info(f"INIT: Updated active_providers: {list(active_providers.keys())}")
+    return True
+    
 
 # SocketIO event handlers
 @socketio.on("audio_stream")
