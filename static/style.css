@@ -328,6 +328,7 @@ h1 {
   overflow-x: auto;
   padding: 0 8px;
   justify-content: center;
+  align-items: flex-start;
 }
 
 .provider-column {
@@ -657,11 +658,26 @@ h1 {
   min-width: 200px;
 }
 
+/* IVR Flow Styles */
+.ivr-flow-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 250px;
+  max-width: 300px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 20px;
+  margin-right: 20px;
+  height: calc(100vh - 200px);
+}
+
 .global-settings-header {
   margin-bottom: 10px;
 }
 
-.global-settings-header h3 {
+.global-settings-header h3, .ivr-flow-header h3 {
   margin: 0;
   color: #47aca9;
   font-size: 16px;
@@ -678,4 +694,36 @@ h1 {
 .global-settings-content input[type="checkbox"] {
   width: 16px;
   height: 16px;
+}
+
+.main-content {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  gap: 20px;
+}
+
+.providers-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.ivr-flow-content {
+  margin-top: 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ivr-flow-content p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #fff;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ivr-flow-header {
+  margin-bottom: 10px;
 }
