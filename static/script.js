@@ -5,6 +5,11 @@ const socket_port = 8001;
 // Provider configurations
 let PROVIDER_CONFIGS = {};
 
+// Global settings
+const PAUSE_THRESHOLD_MS = 3000; // 3 seconds pause threshold for paragraph breaks
+let lastFinalTranscriptTimestamps = {}; // Track last FINAL transcript timestamp for each provider
+let lastAnyTranscriptTimestamps = {}; // Track last ANY transcript timestamp for each provider
+
 // Load provider configurations
 async function loadProviderConfigs() {
     try {
@@ -90,15 +95,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         const interimResultsCheckbox = provider.getElement('.interim_results');
         const interimResultsEnabled = interimResultsCheckbox ? interimResultsCheckbox.checked : true;
         
+        // Get current timestamp
+        const currentTime = new Date().getTime();
+        
+        // Get the timestamp of the last final transcript
+        const lastFinalTime = lastFinalTranscriptTimestamps[provider.id] || 0;
+        
         // Update final container
         if (data.is_final) {
             console.log('Processing FINAL transcription:', data.transcription);
+            
             // Remove any existing interim span
             const existingInterim = finalCaptions.querySelector('.interim-final');
             if (existingInterim) {
                 existingInterim.remove();
             }
-            // For final results, append as a new span
+            
+            // Update the timestamp for the last final transcript
+            lastFinalTranscriptTimestamps[provider.id] = currentTime;
+            
             const finalDiv = document.createElement("span");
             finalDiv.textContent = data.transcription + " ";
             finalDiv.className = "final";
@@ -119,6 +134,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         } else {
             console.log('Skipping INTERIM transcription because interim_results is disabled');
         }
+        
+        // Get the timestamp of the last any transcript (interim or final)
+        const lastAnyTime = lastAnyTranscriptTimestamps[provider.id] || 0;
+        
+        // Calculate time since last ANY transcript
+        const timeSinceLastAny = currentTime - lastAnyTime;
+            
+        // Check for paragraph after pauses setting
+        const paragraphsAfterPauses = document.getElementById('paragraphs_after_pauses').checked;
+        
+        // If there was a significant pause since the last ANY transcript, and we've had a final transcript before,
+        // add a paragraph break
+        if (paragraphsAfterPauses && lastFinalTime > 0 && timeSinceLastAny > PAUSE_THRESHOLD_MS) {
+            console.log(`Adding paragraph break after ${timeSinceLastAny}ms pause in transcription activity`);
+            const breakElement = document.createElement("br");
+            finalCaptions.appendChild(breakElement);
+            finalCaptions.appendChild(document.createElement("br"));
+        }
+        
+        // Always update the timestamp for any transcript update (interim or final)
+        lastAnyTranscriptTimestamps[provider.id] = currentTime;
+        
     });
 
     // Add provider button handler
@@ -193,6 +230,7 @@ class Provider {
     this.recordingStartTime = null;
     this.costInterval = null;
     this.pricePerHour = 0;
+    this.lastActivityTimestamp = null;
   }
 
   getElement(selector) {

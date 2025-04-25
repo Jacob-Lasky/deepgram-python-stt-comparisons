@@ -1,6 +1,6 @@
 {
     "language": "en-US",
-    "interim_results": true,
+    "interim_results": false,
     "profanity_filter": false,
     "price_per_hour": 1.00
 }
