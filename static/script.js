@@ -86,6 +86,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
         
+        // Check if interim results are enabled for this provider
+        const interimResultsCheckbox = provider.getElement('.interim_results');
+        const interimResultsEnabled = interimResultsCheckbox ? interimResultsCheckbox.checked : true;
+        
         // Update final container
         if (data.is_final) {
             console.log('Processing FINAL transcription:', data.transcription);
@@ -100,7 +104,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             finalDiv.className = "final";
             finalCaptions.appendChild(finalDiv);
             finalDiv.scrollIntoView({ behavior: "smooth" });
-        } else {
+        } else if (interimResultsEnabled) {
+            // Only process interim results if interim_results is enabled
             console.log('Processing INTERIM transcription:', data.transcription);
             // For interim results, update or create the interim span
             let interimSpan = finalCaptions.querySelector('.interim-final');
@@ -111,6 +116,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             interimSpan.textContent = data.transcription + " ";
             interimSpan.scrollIntoView({ behavior: "smooth" });
+        } else {
+            console.log('Skipping INTERIM transcription because interim_results is disabled');
         }
     });
 
@@ -377,11 +384,6 @@ async function startRecording(provider) {
   
   // Send configuration before starting microphone
   const config = getConfig(provider);
-  // Force interim_results to true for live recording
-  config.interim_results = true;
-  
-  // Update the UI to show interim_results is true
-  provider.getElement('.interim_results').checked = true;
   
   // Collapse the configuration panel
   const configContent = provider.getElement('.config-content');
@@ -445,7 +447,7 @@ async function stopRecording(provider) {
     console.log(`Client: Microphone closed for provider ${provider.id}`);
     document.body.classList.remove(`recording-${provider.id}`);
     
-    // Reset interim_results to the checkbox state
+    // Get the current configuration
     const config = getConfig(provider);
   }
 }
