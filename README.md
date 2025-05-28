@@ -30,10 +30,12 @@ pip install -r requirements.txt
 
 #### Edit the config file
 
-Copy the code from `sample.env` and create a new file called `.env`. Paste in the code and enter your API key you generated in the [Deepgram console](https://console.deepgram.com/).
+Copy the code from `sample.env` and create a new file called `.env`. Paste in the code and enter your API key you generated in the [Deepgram console](https://console.deepgram.com/) and paste in the Azure Speech Key and Region.
 
 ```js
 DEEPGRAM_API_KEY="your_key_here"
+AZURE_SPEECH_KEY="your_key_here"
+AZURE_SPEECH_REGION="your_region_here"
 ```
 
 #### Run the application
